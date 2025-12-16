@@ -10,6 +10,7 @@ export default function LoginPage() {
     email: '',
     password: '',
     name: '',
+    organization_name: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,9 +22,9 @@ export default function LoginPage() {
 
     try {
       const endpoint = isSignup ? '/auth/signup' : '/auth/login';
-      const body = isSignup 
-        ? { ...formData, role: 'manager' }
-        : { email: formData.email, password: formData.password };
+        const body = isSignup 
+          ? { ...formData }
+          : { email: formData.email, password: formData.password };
 
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(`${API_URL}${endpoint}`, {
@@ -71,19 +72,35 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {isSignup && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                placeholder="John Doe"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="John Doe"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Company/Call Center Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.organization_name}
+                  onChange={(e) => setFormData({ ...formData, organization_name: e.target.value })}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="ABC Call Center"
+                />
+              </div>
+            </>
           )}
 
           <div>
