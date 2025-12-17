@@ -32,6 +32,9 @@ export default function UploadPage() {
   const [bulkCampaign, setBulkCampaign] = useState('Bulk Upload');
   const [bulkUploading, setBulkUploading] = useState(false);
   const [bulkResults, setBulkResults] = useState<any>(null);
+  const [qaConfigs, setQaConfigs] = useState<Array<{id: number, name: string}>>([]);
+  const [selectedQaConfigId, setSelectedQaConfigId] = useState<number | null>(null);
+  const [bulkQaConfigId, setBulkQaConfigId] = useState<number | null>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -43,6 +46,7 @@ export default function UploadPage() {
       return;
     }
     fetchAgents();
+    fetchQaConfigs();
   }, [router]);
 
   const getAuthHeaders = () => {
@@ -68,6 +72,27 @@ export default function UploadPage() {
       }
     } catch (error) {
       console.error('Error fetching agents:', error);
+    }
+  };
+
+  const fetchQaConfigs = async () => {
+    try {
+      const response = await fetch(`${API_URL}/qa-configs/list`, {
+        headers: getAuthHeaders()
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setQaConfigs(data.configs);
+        // Set default as selected
+        const defaultConfig = data.configs.find((c: any) => c.is_default);
+        if (defaultConfig) {
+          setSelectedQaConfigId(defaultConfig.id);
+          setBulkQaConfigId(defaultConfig.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching QA configs:', error);
     }
   };
 
@@ -111,7 +136,7 @@ export default function UploadPage() {
       ));
 
       const response = await fetch(
-        `${API_URL}/calls/upload?agent_id=${agentId}&campaign=${campaign}`,
+          `${API_URL}/calls/upload?agent_id=${agentId}&campaign=${campaign}&qa_config_id=${selectedQaConfigId}`,
         {
           method: 'POST',
           headers: getAuthHeaders(),
@@ -184,6 +209,9 @@ const handleBulkUpload = async () => {
     }
     if (bulkCampaign) {
       params.append('default_campaign', bulkCampaign);
+    }
+    if (bulkQaConfigId) {
+      params.append('qa_config_id', bulkQaConfigId.toString());
     }
 
     const response = await fetch(
@@ -295,6 +323,25 @@ const handleBulkUpload = async () => {
                     </p>
                   )}
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    QA Rubric
+                  </label>
+                  <select
+                    value={selectedQaConfigId || ''}
+                    onChange={(e) => setSelectedQaConfigId(Number(e.target.value))}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <option value="">Select rubric...</option>
+                    {qaConfigs.map((config) => (
+                      <option key={config.id} value={config.id}>
+                        {config.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Campaign
@@ -519,6 +566,25 @@ const handleBulkUpload = async () => {
                         placeholder="e.g., Sales Campaign"
                       />
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        QA Rubric
+                      </label>
+                      <select
+                        value={bulkQaConfigId || ''}
+                        onChange={(e) => setBulkQaConfigId(Number(e.target.value))}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="">Select rubric...</option>
+                        {qaConfigs.map((config) => (
+                          <option key={config.id} value={config.id}>
+                            {config.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
                   </div>
                 </div>
               </div>
