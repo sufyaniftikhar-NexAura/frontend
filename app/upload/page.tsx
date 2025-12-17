@@ -12,19 +12,30 @@ interface UploadStatus {
   callId?: number;
 }
 
+interface Agent {
+  id: number;
+  name: string;
+  email: string;
+}
+
 export default function UploadPage() {
   const router = useRouter();
   const [files, setFiles] = useState<UploadStatus[]>([]);
   const [campaign, setCampaign] = useState('test');
-  const [agentId, setAgentId] = useState('1');
+  const [agentId, setAgentId] = useState<number | null>(null);
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Check authentication
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+  // Check authentication and fetch agents
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
       router.push('/login');
+      return;
     }
+    fetchAgents();
   }, [router]);
 
   const getAuthHeaders = () => {
@@ -32,6 +43,25 @@ export default function UploadPage() {
     return {
       'Authorization': `Bearer ${token}`
     };
+  };
+
+  const fetchAgents = async () => {
+    try {
+      const response = await fetch(`${API_URL}/auth/agents/list`, {
+        headers: getAuthHeaders()
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAgents(data.agents);
+        // Set first agent as default if available
+        if (data.agents.length > 0) {
+          setAgentId(data.agents[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching agents:', error);
+    }
   };
 
   const handleFileSelect = (selectedFiles: FileList | null) => {
@@ -53,6 +83,17 @@ export default function UploadPage() {
   };
 
   const uploadFile = async (fileStatus: UploadStatus, index: number) => {
+    if (!agentId) {
+      setFiles(prev => prev.map((f, i) => 
+        i === index ? { 
+          ...f, 
+          status: 'error', 
+          message: 'Please select an agent' 
+        } : f
+      ));
+      return;
+    }
+
     const formData = new FormData();
     formData.append('file', fileStatus.file);
 
@@ -62,7 +103,6 @@ export default function UploadPage() {
         i === index ? { ...f, status: 'uploading', progress: 50 } : f
       ));
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(
         `${API_URL}/calls/upload?agent_id=${agentId}&campaign=${campaign}`,
         {
@@ -144,14 +184,25 @@ export default function UploadPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Agent ID
+                Select Agent
               </label>
-              <input
-                type="number"
-                value={agentId}
-                onChange={(e) => setAgentId(e.target.value)}
+              <select
+                value={agentId || ''}
+                onChange={(e) => setAgentId(Number(e.target.value))}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
+              >
+                <option value="">Select an agent...</option>
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name} ({agent.email})
+                  </option>
+                ))}
+              </select>
+              {agents.length === 0 && (
+                <p className="text-sm text-gray-500 mt-1">
+                  No agents found. Create agents in Team Management first.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -231,7 +282,7 @@ export default function UploadPage() {
           <div className="flex gap-4 mb-6">
             <button
               onClick={handleUploadAll}
-              disabled={pendingCount === 0}
+              disabled={pendingCount === 0 || !agentId}
               className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-lg font-medium"
             >
               Upload {pendingCount} File{pendingCount !== 1 ? 's' : ''}
