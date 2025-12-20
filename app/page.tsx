@@ -50,6 +50,14 @@ export default function Dashboard() {
       const response = await fetch(`${API_URL}/calls/dashboard/summary`, {
         headers: getAuthHeaders()
       });
+
+      if (response.status === 401) {
+      // Token expired
+      localStorage.clear();
+      router.push('/login');
+      return;
+      }
+      
       const result = await response.json();
       setData(result);
       setLoading(false);
