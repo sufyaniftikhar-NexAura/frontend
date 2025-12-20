@@ -247,18 +247,18 @@ const handleBulkUpload = async () => {
   const errorCount = files.filter(f => f.status === 'error').length;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50/20 to-purple-50/10">
       {/* Header */}
-      <header className="bg-white shadow">
+      <header className="bg-white/80 backdrop-blur-lg shadow-lg border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Upload Calls</h1>
-              <p className="text-gray-600">Upload audio files for QA evaluation</p>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent">Upload Calls</h1>
+              <p className="text-gray-600 mt-1 font-medium">Upload audio files for QA evaluation</p>
             </div>
             <button
               onClick={() => router.push('/')}
-              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
+              className="px-6 py-3 bg-gradient-to-r from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 text-gray-800 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
             >
               ← Back to Dashboard
             </button>
@@ -266,27 +266,27 @@ const handleBulkUpload = async () => {
         </div>
       </header>
   
-      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      <main className="max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
         {/* Mode Tabs */}
-        <div className="bg-white rounded-lg shadow mb-6">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg mb-8 border border-gray-100">
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px">
               <button
                 onClick={() => setUploadMode('single')}
-                className={`px-6 py-3 text-sm font-medium border-b-2 ${
+                className={`px-8 py-4 text-base font-semibold border-b-3 transition-all duration-200 ${
                   uploadMode === 'single'
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 Single/Multiple Files
               </button>
               <button
                 onClick={() => setUploadMode('bulk')}
-                className={`px-6 py-3 text-sm font-medium border-b-2 ${
+                className={`px-8 py-4 text-base font-semibold border-b-3 transition-all duration-200 ${
                   uploadMode === 'bulk'
-                    ? 'border-indigo-600 text-indigo-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
+                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300 hover:bg-gray-50'
                 }`}
               >
                 Bulk Upload (ZIP + CSV)
@@ -298,17 +298,17 @@ const handleBulkUpload = async () => {
         {uploadMode === 'single' ? (
           <>
             {/* EXISTING SINGLE UPLOAD CODE - Keep everything as is */}
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Upload Settings</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 mb-8 border border-gray-100">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Upload Settings</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
                     Select Agent
                   </label>
                   <select
                     value={agentId || ''}
                     onChange={(e) => setAgentId(Number(e.target.value))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
                   >
                     <option value="">Select an agent...</option>
                     {agents.map((agent) => (
@@ -318,20 +318,20 @@ const handleBulkUpload = async () => {
                     ))}
                   </select>
                   {agents.length === 0 && (
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-sm text-gray-600 mt-2 font-medium">
                       No agents found. Create agents in Team Management first.
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
                     QA Rubric
                   </label>
                   <select
                     value={selectedQaConfigId || ''}
                     onChange={(e) => setSelectedQaConfigId(Number(e.target.value))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
                   >
                     <option value="">Select rubric...</option>
                     {qaConfigs.map((config) => (
@@ -343,14 +343,14 @@ const handleBulkUpload = async () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
                     Campaign
                   </label>
                   <input
                     type="text"
                     value={campaign}
                     onChange={(e) => setCampaign(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
                   />
                 </div>
               </div>
@@ -361,17 +361,19 @@ const handleBulkUpload = async () => {
               onDrop={handleDrop}
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
-              className={`border-2 border-dashed rounded-lg p-12 text-center mb-6 transition-colors ${
-                isDragging 
-                  ? 'border-indigo-600 bg-indigo-50' 
-                  : 'border-gray-300 bg-white hover:border-indigo-400'
+              className={`border-3 border-dashed rounded-3xl p-16 text-center mb-8 transition-all duration-300 ${
+                isDragging
+                  ? 'border-indigo-600 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-xl scale-105'
+                  : 'border-gray-300 bg-white/90 backdrop-blur-sm hover:border-indigo-400 hover:shadow-lg shadow-md'
               }`}
             >
-              <Upload className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <p className="text-xl font-semibold text-gray-900 mb-2">
+              <div className={`transition-transform duration-300 ${isDragging ? 'scale-110' : ''}`}>
+                <Upload className={`w-20 h-20 mx-auto mb-6 ${isDragging ? 'text-indigo-600' : 'text-gray-400'}`} />
+              </div>
+              <p className="text-2xl font-bold text-gray-900 mb-3">
                 Drop audio files here
               </p>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-6 text-lg">
                 or click to browse
               </p>
               <input
@@ -384,51 +386,51 @@ const handleBulkUpload = async () => {
               />
               <label
                 htmlFor="file-input"
-                className="inline-block px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 cursor-pointer font-medium"
+                className="inline-block px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 cursor-pointer font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
               >
                 Select Files
               </label>
-              <p className="text-sm text-gray-500 mt-4">
+              <p className="text-sm text-gray-600 mt-6 font-medium">
                 Supports: WAV, MP3, M4A, FLAC
               </p>
             </div>
             
             {/* Stats */}
             {files.length > 0 && (
-              <div className="grid grid-cols-4 gap-4 mb-6">
-                <div className="bg-white rounded-lg shadow p-4">
-                  <div className="text-sm text-gray-600">Total Files</div>
-                  <div className="text-2xl font-bold text-gray-900">{files.length}</div>
+              <div className="grid grid-cols-4 gap-6 mb-8">
+                <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-200 border border-gray-100">
+                  <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Files</div>
+                  <div className="text-3xl font-bold text-gray-900 mt-2">{files.length}</div>
                 </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                  <div className="text-sm text-gray-600">Pending</div>
-                  <div className="text-2xl font-bold text-orange-600">{pendingCount}</div>
+                <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-200 border border-orange-100">
+                  <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Pending</div>
+                  <div className="text-3xl font-bold text-orange-600 mt-2">{pendingCount}</div>
                 </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                  <div className="text-sm text-gray-600">Success</div>
-                  <div className="text-2xl font-bold text-green-600">{successCount}</div>
+                <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-200 border border-green-100">
+                  <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Success</div>
+                  <div className="text-3xl font-bold text-green-600 mt-2">{successCount}</div>
                 </div>
-                <div className="bg-white rounded-lg shadow p-4">
-                  <div className="text-sm text-gray-600">Failed</div>
-                  <div className="text-2xl font-bold text-red-600">{errorCount}</div>
+                <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-200 border border-red-100">
+                  <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Failed</div>
+                  <div className="text-3xl font-bold text-red-600 mt-2">{errorCount}</div>
                 </div>
               </div>
             )}
-  
+
             {/* Action Buttons */}
             {files.length > 0 && (
-              <div className="flex gap-4 mb-6">
+              <div className="flex gap-4 mb-8">
                 <button
                   onClick={handleUploadAll}
                   disabled={pendingCount === 0 || !agentId}
-                  className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-lg font-medium"
+                  className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:transform-none"
                 >
                   Upload {pendingCount} File{pendingCount !== 1 ? 's' : ''}
                 </button>
                 {successCount > 0 && (
                   <button
                     onClick={clearCompleted}
-                    className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium"
+                    className="px-8 py-4 bg-gradient-to-r from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 text-gray-800 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
                   >
                     Clear Completed
                   </button>
@@ -438,30 +440,30 @@ const handleBulkUpload = async () => {
   
             {/* Files List */}
             {files.length > 0 && (
-              <div className="bg-white rounded-lg shadow overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-xl font-semibold text-gray-900">Files</h2>
+              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+                <div className="px-8 py-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+                  <h2 className="text-2xl font-bold text-gray-900">Files</h2>
                 </div>
                 <div className="divide-y divide-gray-200">
                   {files.map((fileStatus, index) => (
-                    <div key={index} className="px-6 py-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-3 flex-1">
+                    <div key={index} className="px-8 py-6 hover:bg-indigo-50/30 transition-colors duration-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-4 flex-1">
                           {fileStatus.status === 'pending' && (
-                            <div className="w-5 h-5 rounded-full border-2 border-gray-300" />
+                            <div className="w-6 h-6 rounded-full border-3 border-gray-300" />
                           )}
                           {fileStatus.status === 'uploading' && (
-                            <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+                            <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
                           )}
                           {fileStatus.status === 'success' && (
-                            <CheckCircle className="w-5 h-5 text-green-600" />
+                            <CheckCircle className="w-6 h-6 text-green-600" />
                           )}
                           {fileStatus.status === 'error' && (
-                            <XCircle className="w-5 h-5 text-red-600" />
+                            <XCircle className="w-6 h-6 text-red-600" />
                           )}
                           <div className="flex-1">
-                            <p className="font-medium text-gray-900">{fileStatus.file.name}</p>
-                            <p className="text-sm text-gray-500">
+                            <p className="font-bold text-gray-900 text-lg">{fileStatus.file.name}</p>
+                            <p className="text-sm text-gray-600 mt-1 font-medium">
                               {(fileStatus.file.size / 1024 / 1024).toFixed(2)} MB
                               {fileStatus.message && ` • ${fileStatus.message}`}
                             </p>
@@ -470,16 +472,16 @@ const handleBulkUpload = async () => {
                         {fileStatus.callId && (
                           <button
                             onClick={() => router.push(`/?view=${fileStatus.callId}`)}
-                            className="text-indigo-600 hover:text-indigo-900 font-medium text-sm"
+                            className="text-indigo-600 hover:text-indigo-900 font-semibold text-sm hover:underline underline-offset-2 transition-all duration-200"
                           >
                             View QA →
                           </button>
                         )}
                       </div>
                       {fileStatus.status === 'uploading' && (
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                           <div
-                            className="bg-indigo-600 h-2 rounded-full transition-all"
+                            className="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-300"
                             style={{ width: `${fileStatus.progress}%` }}
                           ></div>
                         </div>
@@ -493,57 +495,57 @@ const handleBulkUpload = async () => {
         ) : (
           <>
             {/* BULK UPLOAD MODE */}
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Bulk Upload Settings</h2>
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 mb-8 border border-gray-100">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Bulk Upload Settings</h2>
               
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {/* ZIP File Upload */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
                     ZIP File (Required)
                   </label>
                   <input
                     type="file"
                     accept=".zip"
                     onChange={(e) => setBulkZipFile(e.target.files?.[0] || null)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
                   />
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-gray-600 mt-2 font-medium">
                     Upload a ZIP file containing audio files (.wav, .mp3, .m4a, .flac)
                   </p>
                 </div>
-        
+
                 {/* CSV File Upload (Optional) */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-2">
                     CSV Metadata File (Optional)
                   </label>
                   <input
                     type="file"
                     accept=".csv"
                     onChange={(e) => setBulkCsvFile(e.target.files?.[0] || null)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
                   />
-                  <p className="text-sm text-gray-500 mt-1">
+                  <p className="text-sm text-gray-600 mt-2 font-medium">
                     CSV with columns: filename, agent_id, campaign, call_date
                   </p>
                 </div>
         
                 {/* Default Settings (used when no CSV) */}
-                <div className="border-t pt-4 mt-4">
-                  <h3 className="text-sm font-medium text-gray-900 mb-3">
+                <div className="border-t-2 border-gray-200 pt-6 mt-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-5">
                     Default Settings (for files not in CSV)
                   </h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
                         Default Agent
                       </label>
                       <select
                         value={bulkAgentId || ''}
                         onChange={(e) => setBulkAgentId(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
                       >
                         <option value="">Select an agent...</option>
                         {agents.map((agent) => (
@@ -553,28 +555,28 @@ const handleBulkUpload = async () => {
                         ))}
                       </select>
                     </div>
-                      
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
                         Default Campaign
                       </label>
                       <input
                         type="text"
                         value={bulkCampaign}
                         onChange={(e) => setBulkCampaign(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
                         placeholder="e.g., Sales Campaign"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
                         QA Rubric
                       </label>
                       <select
                         value={bulkQaConfigId || ''}
                         onChange={(e) => setBulkQaConfigId(Number(e.target.value))}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
                       >
                         <option value="">Select rubric...</option>
                         {qaConfigs.map((config) => (
@@ -591,31 +593,31 @@ const handleBulkUpload = async () => {
             </div>
                       
             {/* Upload Button */}
-            <div className="mb-6">
+            <div className="mb-8">
               <button
                 onClick={handleBulkUpload}
                 disabled={bulkUploading || !bulkZipFile}
-                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white rounded-lg font-medium"
+                className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:transform-none inline-flex items-center gap-3"
               >
                 {bulkUploading && (
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                 )}
-                {bulkUploading ? 'Processing Files... This may take a few minutes' : 'Upload & Process Bulk Files'}
+                <span>{bulkUploading ? 'Processing Files... This may take a few minutes' : 'Upload & Process Bulk Files'}</span>
               </button>
             </div>
 
             {bulkUploading && (
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="animate-pulse w-2 h-2 bg-blue-600 rounded-full"></div>
+              <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-300 rounded-2xl shadow-md">
+                <div className="flex items-center gap-4">
+                  <div className="animate-pulse w-3 h-3 bg-blue-600 rounded-full"></div>
                   <div>
-                    <p className="text-sm font-medium text-blue-900">
+                    <p className="text-base font-bold text-blue-900">
                       Processing bulk upload...
                     </p>
-                    <p className="text-xs text-blue-700 mt-1">
+                    <p className="text-sm text-blue-700 mt-1.5 font-medium">
                       Uploading, transcribing, and evaluating calls. Estimated time: ~30 seconds per file.
                     </p>
                   </div>
@@ -625,21 +627,21 @@ const handleBulkUpload = async () => {
                       
             {/* Results */}
             {bulkResults && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Bulk Upload Results</h3>
-                
-                <div className="grid grid-cols-3 gap-4 mb-6">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-600">Total Files</div>
-                    <div className="text-2xl font-bold text-gray-900">{bulkResults.total_files}</div>
+              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-gray-100">
+                <h3 className="text-2xl font-bold text-gray-900 mb-6">Bulk Upload Results</h3>
+
+                <div className="grid grid-cols-3 gap-6 mb-8">
+                  <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 shadow-md border border-gray-200">
+                    <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Files</div>
+                    <div className="text-3xl font-bold text-gray-900 mt-2">{bulkResults.total_files}</div>
                   </div>
-                  <div className="bg-green-50 rounded-lg p-4">
-                    <div className="text-sm text-green-600">Successful</div>
-                    <div className="text-2xl font-bold text-green-600">{bulkResults.successful}</div>
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 shadow-md border border-green-200">
+                    <div className="text-sm font-semibold text-green-700 uppercase tracking-wide">Successful</div>
+                    <div className="text-3xl font-bold text-green-600 mt-2">{bulkResults.successful}</div>
                   </div>
-                  <div className="bg-red-50 rounded-lg p-4">
-                    <div className="text-sm text-red-600">Failed</div>
-                    <div className="text-2xl font-bold text-red-600">{bulkResults.failed}</div>
+                  <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-6 shadow-md border border-red-200">
+                    <div className="text-sm font-semibold text-red-700 uppercase tracking-wide">Failed</div>
+                    <div className="text-3xl font-bold text-red-600 mt-2">{bulkResults.failed}</div>
                   </div>
                 </div>
             
