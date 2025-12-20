@@ -95,10 +95,13 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading dashboard...</p>
+          <div className="relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 border-t-indigo-600 mx-auto mb-4"></div>
+            <div className="absolute inset-0 animate-ping rounded-full h-16 w-16 border-4 border-indigo-400 opacity-20 mx-auto"></div>
+          </div>
+          <p className="text-gray-700 font-medium text-lg">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -123,31 +126,31 @@ export default function Dashboard() {
   const user = getUserInfo();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20">
       {/* Header */}
-      <header className="bg-white shadow">
+      <header className="bg-white/80 backdrop-blur-lg shadow-lg border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">QA Dashboard</h1>
-              <p className="text-gray-600">Call Center Quality Assurance</p>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent">QA Dashboard</h1>
+              <p className="text-gray-600 mt-1 font-medium">Call Center Quality Assurance</p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               {user && user.role === 'manager' && (
                 <>
                 <button
                   onClick={() => router.push('/team')}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 text-gray-700 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md border border-gray-200"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                   </svg>
                   Manage Team
                 </button>
-                
+
                 <button
                   onClick={() => router.push('/qa-configs')}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 text-gray-700 rounded-xl font-medium transition-all duration-200 shadow-sm hover:shadow-md border border-gray-200"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -159,17 +162,17 @@ export default function Dashboard() {
 
               <button
                 onClick={() => router.push('/upload')}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium"
+                className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
                 Upload Calls
               </button>
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+              <div className="text-right px-3">
+                <p className="text-sm font-semibold text-gray-900">{user.name}</p>
+                <p className="text-xs text-gray-500 capitalize font-medium">{user.role}</p>
               </div>
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-medium transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 Logout
               </button>
@@ -181,93 +184,114 @@ export default function Dashboard() {
       <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600">Total Calls</div>
-            <div className="text-3xl font-bold text-gray-900 mt-2">{data.total_calls}</div>
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl p-7 transition-all duration-300 transform hover:-translate-y-1 border border-gray-100">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Calls</div>
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+              </div>
+            </div>
+            <div className="text-4xl font-bold text-gray-900">{data.total_calls}</div>
           </div>
-          
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600">Calls Evaluated</div>
-            <div className="text-3xl font-bold text-indigo-600 mt-2">{data.calls_evaluated}</div>
+
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl p-7 transition-all duration-300 transform hover:-translate-y-1 border border-indigo-100">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Calls Evaluated</div>
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <div className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">{data.calls_evaluated}</div>
           </div>
-          
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600">Average Score</div>
-            <div className="text-3xl font-bold text-green-600 mt-2">
+
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl p-7 transition-all duration-300 transform hover:-translate-y-1 border border-green-100">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Average Score</div>
+              <div className="p-2 bg-green-100 rounded-lg">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </div>
+            </div>
+            <div className="text-4xl font-bold text-green-600">
               {data.average_score.toFixed(1)}%
             </div>
           </div>
         </div>
 
         {/* Calls Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Recent Calls</h2>
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden border border-gray-100">
+          <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
+            <h2 className="text-2xl font-bold text-gray-900">Recent Calls</h2>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                     Call ID
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                     Agent
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                     Campaign
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                     QA Score
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                     Grade
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white/50 divide-y divide-gray-200">
                 {data.calls.map((call) => (
-                  <tr key={call.call_id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <tr key={call.call_id} className="hover:bg-indigo-50/50 transition-colors duration-200">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
                       #{call.call_id}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {call.agent_name}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {call.campaign}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {new Date(call.call_date).toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       {call.qa_score !== null ? (
-                        <span className={`font-semibold ${
-                          call.qa_score >= 80 ? 'text-green-600' :
-                          call.qa_score >= 60 ? 'text-yellow-600' :
-                          'text-red-600'
+                        <span className={`font-bold px-3 py-1 rounded-lg ${
+                          call.qa_score >= 80 ? 'bg-green-100 text-green-700' :
+                          call.qa_score >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
                         }`}>
                           {call.qa_score}%
                         </span>
                       ) : (
-                        <span className="text-gray-400">Not evaluated</span>
+                        <span className="text-gray-400 italic">Not evaluated</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {call.qa_grade ? (
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          call.qa_grade === 'A' ? 'bg-green-100 text-green-800' :
-                          call.qa_grade === 'B' ? 'bg-blue-100 text-blue-800' :
-                          call.qa_grade === 'C' ? 'bg-yellow-100 text-yellow-800' :
-                          call.qa_grade === 'D' ? 'bg-orange-100 text-orange-800' :
-                          'bg-red-100 text-red-800'
+                        <span className={`px-3 py-1.5 text-xs font-bold rounded-xl shadow-sm ${
+                          call.qa_grade === 'A' ? 'bg-gradient-to-r from-green-500 to-green-600 text-white' :
+                          call.qa_grade === 'B' ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white' :
+                          call.qa_grade === 'C' ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-white' :
+                          call.qa_grade === 'D' ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white' :
+                          'bg-gradient-to-r from-red-500 to-red-600 text-white'
                         }`}>
                           {call.qa_grade}
                         </span>
@@ -282,7 +306,7 @@ export default function Dashboard() {
                             setSelectedCall(call.call_id);
                             fetchCallDetails(call.call_id);
                           }}
-                          className="text-indigo-600 hover:text-indigo-900 font-medium"
+                          className="text-indigo-600 hover:text-indigo-900 font-semibold hover:underline underline-offset-2 transition-all duration-200"
                         >
                           View Details →
                         </button>
@@ -300,20 +324,23 @@ export default function Dashboard() {
 
       {/* Modal for call details */}
       {selectedCall && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white rounded-3xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl transform transition-all duration-300 scale-100 border border-gray-200">
             {loadingDetails ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading call details...</p>
+              <div className="text-center py-12">
+                <div className="relative inline-block">
+                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 border-t-indigo-600 mx-auto mb-4"></div>
+                  <div className="absolute inset-0 animate-ping rounded-full h-16 w-16 border-4 border-indigo-400 opacity-20"></div>
+                </div>
+                <p className="text-gray-700 font-medium text-lg">Loading call details...</p>
               </div>
             ) : callDetails ? (
               <>
                 {/* Header */}
-                <div className="flex justify-between items-start mb-6">
+                <div className="flex justify-between items-start mb-8">
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900">Call #{callDetails.call_id}</h3>
-                    <p className="text-gray-600 mt-1">
+                    <h3 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Call #{callDetails.call_id}</h3>
+                    <p className="text-gray-600 mt-2 font-medium">
                       {callDetails.agent_name} • {callDetails.campaign} • {new Date(callDetails.call_date).toLocaleString()}
                     </p>
                   </div>
@@ -322,7 +349,7 @@ export default function Dashboard() {
                       setSelectedCall(null);
                       setCallDetails(null);
                     }}
-                    className="text-gray-400 hover:text-gray-600 text-2xl"
+                    className="text-gray-400 hover:text-gray-600 text-3xl transition-colors duration-200 hover:rotate-90 transform"
                   >
                     ×
                   </button>
@@ -331,20 +358,20 @@ export default function Dashboard() {
                 {callDetails.qa_evaluation ? (
                   <>
                     {/* Overall Score */}
-                    <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg p-6 mb-6">
+                    <div className="bg-gradient-to-r from-indigo-100 via-purple-100 to-blue-100 rounded-2xl p-8 mb-8 shadow-lg border border-indigo-200">
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-sm font-medium text-gray-600">Overall Score</div>
-                          <div className="text-5xl font-bold text-indigo-600 mt-2">
+                          <div className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-2">Overall Score</div>
+                          <div className="text-6xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                             {callDetails.qa_evaluation.overall_score}%
                           </div>
                         </div>
-                        <div className={`text-6xl font-bold px-6 py-3 rounded-lg ${
-                          callDetails.qa_evaluation.overall_grade === 'A' ? 'bg-green-100 text-green-600' :
-                          callDetails.qa_evaluation.overall_grade === 'B' ? 'bg-blue-100 text-blue-600' :
-                          callDetails.qa_evaluation.overall_grade === 'C' ? 'bg-yellow-100 text-yellow-600' :
-                          callDetails.qa_evaluation.overall_grade === 'D' ? 'bg-orange-100 text-orange-600' :
-                          'bg-red-100 text-red-600'
+                        <div className={`text-7xl font-bold px-8 py-4 rounded-2xl shadow-xl transform transition-transform hover:scale-110 ${
+                          callDetails.qa_evaluation.overall_grade === 'A' ? 'bg-gradient-to-br from-green-500 to-green-600 text-white' :
+                          callDetails.qa_evaluation.overall_grade === 'B' ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white' :
+                          callDetails.qa_evaluation.overall_grade === 'C' ? 'bg-gradient-to-br from-yellow-400 to-yellow-500 text-white' :
+                          callDetails.qa_evaluation.overall_grade === 'D' ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white' :
+                          'bg-gradient-to-br from-red-500 to-red-600 text-white'
                         }`}>
                           {callDetails.qa_evaluation.overall_grade}
                         </div>
@@ -352,29 +379,29 @@ export default function Dashboard() {
                     </div>
 
                     {/* Category Scores */}
-                    <div className="mb-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Category Scores</h4>
-                      <div className="grid grid-cols-2 gap-4">
+                    <div className="mb-8">
+                      <h4 className="text-xl font-bold text-gray-900 mb-5">Category Scores</h4>
+                      <div className="grid grid-cols-2 gap-5">
                         {Object.entries(callDetails.qa_evaluation.categories).map(([category, score]: [string, any]) => (
-                          <div key={category} className="bg-gray-50 rounded-lg p-4">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-sm font-medium text-gray-700 capitalize">
+                          <div key={category} className="bg-gradient-to-br from-gray-50 to-white rounded-xl p-5 shadow-md hover:shadow-lg transition-all duration-200 border border-gray-200">
+                            <div className="flex justify-between items-center mb-3">
+                              <span className="text-sm font-bold text-gray-700 capitalize">
                                 {category.replace('_', ' ')}
                               </span>
-                              <span className={`text-lg font-bold ${
-                                score >= 80 ? 'text-green-600' :
-                                score >= 60 ? 'text-yellow-600' :
-                                'text-red-600'
+                              <span className={`text-xl font-bold px-3 py-1 rounded-lg ${
+                                score >= 80 ? 'bg-green-100 text-green-700' :
+                                score >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
                               }`}>
                                 {score}%
                               </span>
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                               <div
-                                className={`h-2 rounded-full ${
-                                  score >= 80 ? 'bg-green-500' :
-                                  score >= 60 ? 'bg-yellow-500' :
-                                  'bg-red-500'
+                                className={`h-3 rounded-full transition-all duration-500 ${
+                                  score >= 80 ? 'bg-gradient-to-r from-green-400 to-green-600' :
+                                  score >= 60 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600' :
+                                  'bg-gradient-to-r from-red-400 to-red-600'
                                 }`}
                                 style={{ width: `${score}%` }}
                               ></div>
@@ -385,26 +412,30 @@ export default function Dashboard() {
                     </div>
 
                     {/* Strengths */}
-                    <div className="mb-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-3">✅ Strengths</h4>
-                      <ul className="space-y-2">
+                    <div className="mb-8">
+                      <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <span className="text-2xl">✅</span> Strengths
+                      </h4>
+                      <ul className="space-y-3">
                         {callDetails.qa_evaluation.strengths.map((strength: string, idx: number) => (
-                          <li key={idx} className="flex items-start">
-                            <span className="text-green-500 mr-2">•</span>
-                            <span className="text-gray-700">{strength}</span>
+                          <li key={idx} className="flex items-start bg-green-50 p-4 rounded-xl border border-green-200">
+                            <span className="text-green-600 mr-3 text-xl">•</span>
+                            <span className="text-gray-800 font-medium">{strength}</span>
                           </li>
                         ))}
                       </ul>
                     </div>
 
                     {/* Improvements */}
-                    <div className="mb-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-3">📈 Areas for Improvement</h4>
-                      <ul className="space-y-2">
+                    <div className="mb-8">
+                      <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <span className="text-2xl">📈</span> Areas for Improvement
+                      </h4>
+                      <ul className="space-y-3">
                         {callDetails.qa_evaluation.improvements.map((improvement: string, idx: number) => (
-                          <li key={idx} className="flex items-start">
-                            <span className="text-orange-500 mr-2">•</span>
-                            <span className="text-gray-700">{improvement}</span>
+                          <li key={idx} className="flex items-start bg-orange-50 p-4 rounded-xl border border-orange-200">
+                            <span className="text-orange-600 mr-3 text-xl">•</span>
+                            <span className="text-gray-800 font-medium">{improvement}</span>
                           </li>
                         ))}
                       </ul>
@@ -412,8 +443,10 @@ export default function Dashboard() {
 
                     {/* Transcript */}
                     <div>
-                      <h4 className="text-lg font-semibold text-gray-900 mb-3">📝 Transcript</h4>
-                      <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 font-mono whitespace-pre-wrap" dir="rtl">
+                      <h4 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <span className="text-2xl">📝</span> Transcript
+                      </h4>
+                      <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 text-sm text-gray-800 font-mono whitespace-pre-wrap shadow-inner border border-gray-200" dir="rtl">
                         {callDetails.transcript}
                       </div>
                     </div>
@@ -423,13 +456,13 @@ export default function Dashboard() {
                 )}
 
                 {/* Close Button */}
-                <div className="mt-6 flex justify-end">
+                <div className="mt-8 flex justify-end">
                   <button
                     onClick={() => {
                       setSelectedCall(null);
                       setCallDetails(null);
                     }}
-                    className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
+                    className="px-8 py-3 bg-gradient-to-r from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 text-gray-800 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
                   >
                     Close
                   </button>
