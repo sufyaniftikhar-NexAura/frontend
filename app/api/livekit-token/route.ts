@@ -9,7 +9,6 @@ export async function POST(request: NextRequest) {
     const apiSecret = process.env.LIVEKIT_API_SECRET;
     const livekitUrl = process.env.LIVEKIT_URL;
 
-    // Check if credentials are configured
     if (!apiKey || !apiSecret || !livekitUrl) {
       console.error('LiveKit credentials missing:', { 
         hasApiKey: !!apiKey, 
@@ -17,35 +16,48 @@ export async function POST(request: NextRequest) {
         hasUrl: !!livekitUrl 
       });
       return NextResponse.json(
-        { error: 'LiveKit credentials not configured. Please check your .env.local file.' },
+        { error: 'LiveKit credentials not configured' },
         { status: 500 }
       );
     }
 
-    // Create unique room name for this training session
-    const roomName = `umar-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    // Create access token for the participant
-    const token = new AccessToken(apiKey, apiSecret, {
-      identity: participantName || 'trainee',
-      ttl: 3600, // Token valid for 1 hour
-      metadata: JSON.stringify({ 
-        scenarioId: scenarioId || 'billing_complaint' 
-      }),
+    // Create unique room name
+    const roomName = `training-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    
+    // Participant metadata - this is what the agent will read
+    const participantMetadata = JSON.stringify({ 
+      scenarioId: scenarioId || 'billing_complaint',
+      participantName: participantName || 'trainee'
     });
 
-    // Grant permissions to join room and publish/subscribe audio
+    // Create access token
+    const token = new AccessToken(apiKey, apiSecret, {
+      identity: participantName || `trainee-${Date.now()}`,
+      name: participantName || 'Trainee', // Display name
+      metadata: participantMetadata, // This gets passed to participant.metadata
+      ttl: 3600,
+    });
+
+    // Grant permissions
     token.addGrant({
       roomJoin: true,
       room: roomName,
       canPublish: true,
       canSubscribe: true,
+      canPublishData: true,
     });
 
-    console.log('Generated token for room:', roomName, 'scenario:', scenarioId);
+    const jwt = await token.toJwt();
+    
+    console.log('✅ Generated token:', {
+      room: roomName,
+      scenario: scenarioId,
+      participant: participantName,
+      livekitUrl: livekitUrl
+    });
 
     return NextResponse.json({
-      token: await token.toJwt(),
+      token: jwt,
       roomName: roomName,
       url: livekitUrl,
     });
@@ -59,7 +71,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Health check endpoint
 export async function GET() {
   const configured = !!(
     process.env.LIVEKIT_API_KEY && 
@@ -70,8 +81,5 @@ export async function GET() {
   return NextResponse.json({ 
     status: 'ok',
     livekitConfigured: configured,
-    message: configured 
-      ? 'LiveKit is configured' 
-      : 'LiveKit credentials missing - check .env.local'
   });
 }
