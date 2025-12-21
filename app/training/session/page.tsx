@@ -16,6 +16,88 @@ import { Phone, PhoneOff, Loader2, AlertCircle } from 'lucide-react';
 
 import '@livekit/components-styles';
 
+import { AccessToken } from 'livekit-server-sdk';
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function POST(request: NextRequest) {
+  try {
+    const { participantName, scenarioId } = await request.json();
+
+    const apiKey = process.env.LIVEKIT_API_KEY;
+    const apiSecret = process.env.LIVEKIT_API_SECRET;
+    const livekitUrl = process.env.LIVEKIT_URL;
+
+    // DEBUG: Log what we're using (remove in production)
+    console.log('🔑 LiveKit Config:', {
+      apiKeyPrefix: apiKey?.substring(0, 8) + '...',
+      hasSecret: !!apiSecret,
+      url: livekitUrl,
+      scenarioId,
+    });
+
+    if (!apiKey || !apiSecret || !livekitUrl) {
+      console.error('❌ LiveKit credentials missing!');
+      return NextResponse.json(
+        { error: 'LiveKit credentials not configured' },
+        { status: 500 }
+      );
+    }
+
+    // Create unique room name
+    const roomName = `training-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    
+    // Participant metadata
+    const participantMetadata = JSON.stringify({ 
+      scenarioId: scenarioId || 'billing_complaint',
+    });
+
+    const token = new AccessToken(apiKey, apiSecret, {
+      identity: `trainee-${Date.now()}`,
+      name: participantName || 'Trainee',
+      metadata: participantMetadata,
+      ttl: 3600,
+    });
+
+    token.addGrant({
+      roomJoin: true,
+      room: roomName,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+    });
+
+    const jwt = await token.toJwt();
+    
+    console.log('✅ Token generated for room:', roomName);
+
+    return NextResponse.json({
+      token: jwt,
+      roomName: roomName,
+      url: livekitUrl,
+    });
+
+  } catch (error) {
+    console.error('❌ Token generation error:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate token', details: String(error) },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET() {
+  // Health check that also shows config status
+  const apiKey = process.env.LIVEKIT_API_KEY;
+  const livekitUrl = process.env.LIVEKIT_URL;
+  
+  return NextResponse.json({ 
+    status: 'ok',
+    livekitConfigured: !!(apiKey && process.env.LIVEKIT_API_SECRET && livekitUrl),
+    urlConfigured: livekitUrl || 'NOT SET',
+    apiKeyPrefix: apiKey ? apiKey.substring(0, 8) + '...' : 'NOT SET',
+  });
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
