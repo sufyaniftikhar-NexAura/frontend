@@ -13,7 +13,11 @@
     "next": "16.0.10",
     "react": "19.2.1",
     "react-dom": "19.2.1",
-    "recharts": "^2.10.3"
+    "recharts": "^2.10.3",
+    "@livekit/components-react": "^2.6.4",
+    "@livekit/components-styles": "^1.1.4",
+    "livekit-client": "^2.6.1",
+    "livekit-server-sdk": "^2.6.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
