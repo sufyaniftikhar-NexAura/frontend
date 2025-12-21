@@ -16,88 +16,6 @@ import { Phone, PhoneOff, Loader2, AlertCircle } from 'lucide-react';
 
 import '@livekit/components-styles';
 
-import { AccessToken } from 'livekit-server-sdk';
-import { NextRequest, NextResponse } from 'next/server';
-
-export async function POST(request: NextRequest) {
-  try {
-    const { participantName, scenarioId } = await request.json();
-
-    const apiKey = process.env.LIVEKIT_API_KEY;
-    const apiSecret = process.env.LIVEKIT_API_SECRET;
-    const livekitUrl = process.env.LIVEKIT_URL;
-
-    // DEBUG: Log what we're using (remove in production)
-    console.log('🔑 LiveKit Config:', {
-      apiKeyPrefix: apiKey?.substring(0, 8) + '...',
-      hasSecret: !!apiSecret,
-      url: livekitUrl,
-      scenarioId,
-    });
-
-    if (!apiKey || !apiSecret || !livekitUrl) {
-      console.error('❌ LiveKit credentials missing!');
-      return NextResponse.json(
-        { error: 'LiveKit credentials not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Create unique room name
-    const roomName = `training-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    
-    // Participant metadata
-    const participantMetadata = JSON.stringify({ 
-      scenarioId: scenarioId || 'billing_complaint',
-    });
-
-    const token = new AccessToken(apiKey, apiSecret, {
-      identity: `trainee-${Date.now()}`,
-      name: participantName || 'Trainee',
-      metadata: participantMetadata,
-      ttl: 3600,
-    });
-
-    token.addGrant({
-      roomJoin: true,
-      room: roomName,
-      canPublish: true,
-      canSubscribe: true,
-      canPublishData: true,
-    });
-
-    const jwt = await token.toJwt();
-    
-    console.log('✅ Token generated for room:', roomName);
-
-    return NextResponse.json({
-      token: jwt,
-      roomName: roomName,
-      url: livekitUrl,
-    });
-
-  } catch (error) {
-    console.error('❌ Token generation error:', error);
-    return NextResponse.json(
-      { error: 'Failed to generate token', details: String(error) },
-      { status: 500 }
-    );
-  }
-}
-
-export async function GET() {
-  // Health check that also shows config status
-  const apiKey = process.env.LIVEKIT_API_KEY;
-  const livekitUrl = process.env.LIVEKIT_URL;
-  
-  return NextResponse.json({ 
-    status: 'ok',
-    livekitConfigured: !!(apiKey && process.env.LIVEKIT_API_SECRET && livekitUrl),
-    urlConfigured: livekitUrl || 'NOT SET',
-    apiKeyPrefix: apiKey ? apiKey.substring(0, 8) + '...' : 'NOT SET',
-  });
-}
-
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -125,6 +43,7 @@ export default function TrainingSessionPage() {
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
+      console.log('❌ No auth token found');
       router.push('/login');
       return;
     }
@@ -132,10 +51,12 @@ export default function TrainingSessionPage() {
     // Get selected scenario from session storage
     const scenarioId = sessionStorage.getItem('selected_training_scenario');
     if (!scenarioId) {
+      console.log('❌ No scenario selected');
       router.push('/training');
       return;
     }
 
+    console.log('✅ Starting session with scenario:', scenarioId);
     setSelectedScenarioId(scenarioId);
     startSession(scenarioId);
   }, []);
@@ -152,8 +73,10 @@ export default function TrainingSessionPage() {
     setIsConnecting(true);
     setError(null);
 
+    console.log('🔄 Step 1: Getting LiveKit token...');
+
     try {
-      // Step 1: Get LiveKit token from LOCAL API route (no longer external)
+      // Step 1: Get LiveKit token from LOCAL API route
       const livekitResponse = await fetch('/api/livekit-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -168,8 +91,13 @@ export default function TrainingSessionPage() {
       }
 
       const livekitData = await livekitResponse.json();
+      console.log('✅ LiveKit token received:', {
+        roomName: livekitData.roomName,
+        url: livekitData.url
+      });
       
       // Step 2: Create training session in QA SaaS backend
+      console.log('🔄 Step 2: Creating training session in backend...');
       const sessionResponse = await fetch(`${API_URL}/training/sessions/start`, {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -180,26 +108,33 @@ export default function TrainingSessionPage() {
       });
 
       if (!sessionResponse.ok) {
+        const errorData = await sessionResponse.json();
+        console.error('❌ Session creation failed:', errorData);
         throw new Error('Failed to create training session');
       }
 
       const sessionData = await sessionResponse.json();
-      setSessionId(sessionData.session_id);
+      console.log('✅ Training session created:', sessionData);
+      setSessionId(sessionData.id);
 
       // Step 3: Set connection details to start LiveKit
       setConnectionDetails(livekitData);
       setSessionStartTime(new Date());
       setMessages([]);
+      console.log('✅ Ready to connect to LiveKit room');
 
     } catch (err) {
-      console.error('Failed to start session:', err);
+      console.error('💥 Failed to start session:', err);
       setError(err instanceof Error ? err.message : 'Failed to start session');
       setIsConnecting(false);
     }
   };
 
   const endSession = useCallback(async () => {
+    console.log('🔄 End session called');
+    
     if (!sessionId || !sessionStartTime) {
+      console.log('❌ No session ID or start time:', { sessionId, sessionStartTime });
       router.push('/training');
       return;
     }
@@ -207,8 +142,19 @@ export default function TrainingSessionPage() {
     const duration = Math.floor((new Date().getTime() - sessionStartTime.getTime()) / 1000);
     const finalMessages = messages.filter(m => m.isFinal);
 
+    console.log('📊 Session details:', {
+      sessionId,
+      duration,
+      totalMessages: messages.length,
+      finalMessages: finalMessages.length,
+      selectedScenarioId
+    });
+
+    console.log('📝 Final messages:', finalMessages);
+
     try {
-      // Generate evaluation using LOCAL API route (no longer external)
+      // Generate evaluation using LOCAL API route
+      console.log('🔄 Step 1: Calling evaluation API...');
       const evaluationResponse = await fetch('/api/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -217,36 +163,63 @@ export default function TrainingSessionPage() {
             role: m.role,
             content: m.content
           })),
-          scenario: { id: selectedScenarioId },
+          scenario: { 
+            id: selectedScenarioId,
+            name: 'Training Scenario',
+            evaluationFocus: ['Communication', 'Problem Solving']
+          },
           duration
         })
       });
 
+      console.log('📥 Evaluation response status:', evaluationResponse.status);
+
       if (!evaluationResponse.ok) {
-        throw new Error('Failed to generate evaluation');
+        const errorText = await evaluationResponse.text();
+        console.error('❌ Evaluation API error:', errorText);
+        throw new Error(`Evaluation failed: ${evaluationResponse.status}`);
       }
 
       const evaluation = await evaluationResponse.json();
+      console.log('✅ Evaluation received:', evaluation);
 
       // Save session results to QA SaaS backend
-      await fetch(`${API_URL}/training/sessions/${sessionId}/complete`, {
+      console.log('🔄 Step 2: Saving to backend...');
+      const savePayload = {
+        duration_seconds: duration,
+        message_count: finalMessages.length,
+        transcript: finalMessages,
+        evaluation
+      };
+      
+      console.log('📤 Save payload:', savePayload);
+
+      const saveResponse = await fetch(`${API_URL}/training/sessions/${sessionId}/complete`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({
-          duration_seconds: duration,
-          message_count: finalMessages.length,
-          transcript: finalMessages,
-          evaluation
-        })
+        body: JSON.stringify(savePayload)
       });
+
+      console.log('📥 Save response status:', saveResponse.status);
+
+      if (!saveResponse.ok) {
+        const errorText = await saveResponse.text();
+        console.error('❌ Backend save error:', errorText);
+        throw new Error(`Save failed: ${saveResponse.status}`);
+      }
+
+      const saveResult = await saveResponse.json();
+      console.log('✅ Session saved successfully:', saveResult);
 
       // Navigate to results page
       sessionStorage.setItem('training_session_id', sessionId.toString());
+      console.log('✅ Navigating to results page...');
       router.push('/training/results');
 
     } catch (err) {
-      console.error('Error ending session:', err);
-      alert('Failed to save training results. Please try again.');
+      console.error('💥 Error ending session:', err);
+      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack');
+      alert(`Failed to save training results: ${err instanceof Error ? err.message : 'Unknown error'}\n\nCheck console for details.`);
       router.push('/training');
     }
   }, [messages, sessionId, sessionStartTime, selectedScenarioId, router, API_URL]);
@@ -289,10 +262,10 @@ export default function TrainingSessionPage() {
       audio={true}
       video={false}
       onDisconnected={() => {
-        console.log('Disconnected from room');
+        console.log('🔌 Disconnected from room');
       }}
       onError={(err) => {
-        console.error('LiveKit error:', err);
+        console.error('💥 LiveKit error:', err);
         setError(err.message);
       }}
       className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100"
@@ -309,7 +282,7 @@ export default function TrainingSessionPage() {
 }
 
 // ============================================
-// Active Session Component (reusing UMAR's logic)
+// Active Session Component
 // ============================================
 interface ActiveSessionProps {
   sessionStartTime: Date | null;
@@ -369,6 +342,7 @@ function ActiveSession({
           };
           return updated;
         } else {
+          console.log('🤖 Agent message:', segment.text, `(final: ${segment.final})`);
           return [...prev, {
             id: messageId,
             role: 'assistant' as const,
@@ -403,6 +377,7 @@ function ActiveSession({
           };
           return updated;
         } else {
+          console.log('👤 User message:', segment.text, `(final: ${segment.final})`);
           return [...prev, {
             id: messageId,
             role: 'user' as const,
@@ -438,6 +413,8 @@ function ActiveSession({
 
   const status = getStatusDisplay();
   const displayMessages = messages.filter(m => m.content && m.content.trim() !== '');
+
+  console.log('📊 Current messages count:', displayMessages.length);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -514,7 +491,10 @@ function ActiveSession({
         {/* End Session Button */}
         <div className="flex justify-center">
           <button
-            onClick={onEndSession}
+            onClick={() => {
+              console.log('🔴 End Session button clicked');
+              onEndSession();
+            }}
             className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-xl font-semibold transition-all shadow-lg"
           >
             <PhoneOff className="w-5 h-5" />
