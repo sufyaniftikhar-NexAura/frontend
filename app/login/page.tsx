@@ -1,7 +1,21 @@
+// app/login/page.tsx
+/**
+ * Login Page - Cookie-Based Authentication
+ * =========================================
+ * ✅ Task 5: Secure cookie-based authentication
+ * 
+ * CHANGES FROM OLD VERSION:
+ * - ❌ Removed: localStorage.setItem('token')
+ * - ❌ Removed: Authorization header handling
+ * - ✅ Added: credentials: 'include' in fetch
+ * - ✅ Added: Automatic cookie handling by browser
+ */
+
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { login, signup } from '../lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,28 +35,23 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const endpoint = isSignup ? '/auth/signup' : '/auth/login';
-        const body = isSignup 
-          ? { ...formData }
-          : { email: formData.email, password: formData.password };
-
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${API_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || 'Authentication failed');
+      if (isSignup) {
+        // Signup - backend sets httpOnly cookie automatically
+        await signup({
+          email: formData.email,
+          password: formData.password,
+          name: formData.name,
+          organization_name: formData.organization_name,
+        });
+      } else {
+        // Login - backend sets httpOnly cookie automatically
+        await login({
+          email: formData.email,
+          password: formData.password,
+        });
       }
 
-      // Save token and user info to localStorage
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
+      // ✅ Success: Cookie is set, user info stored
       // Redirect to dashboard
       router.push('/');
       
@@ -170,6 +179,16 @@ export default function LoginPage() {
           >
             {isSignup ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
           </button>
+        </div>
+
+        {/* Security Badge */}
+        <div className="mt-8 pt-6 border-t border-gray-200 text-center">
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+            <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            <span>Secured with httpOnly cookies</span>
+          </div>
         </div>
       </div>
     </div>
