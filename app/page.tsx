@@ -27,44 +27,52 @@ export default function Dashboard() {
   const [selectedCall, setSelectedCall] = useState<number | null>(null);
   const [callDetails, setCallDetails] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
-  // Check if user is logged in
+  // ✅ Cookie-based auth - no localStorage needed
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
     fetchDashboard();
-  }, [router]);
-
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return {
-      'Authorization': `Bearer ${token}`
-    };
-  };
+  }, []);
 
   const fetchDashboard = async () => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(`${API_URL}/calls/dashboard/summary`, {
-        headers: getAuthHeaders()
+        credentials: 'include'  // ✅ Use cookies
       });
 
       if (response.status === 401) {
-      // Token expired
-      localStorage.clear();
-      router.push('/login');
-      return;
+        // Not authenticated - redirect to login
+        router.push('/login');
+        return;
       }
       
       const result = await response.json();
       setData(result);
+      
+      // Get user info from the response or fetch separately
+      fetchUserInfo();
+      
       setLoading(false);
     } catch (error) {
       console.error('Error fetching dashboard:', error);
       setLoading(false);
+    }
+  };
+
+  const fetchUserInfo = async () => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/auth/me`, {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+      }
+    } catch (error) {
+      console.error('Error fetching user info:', error);
     }
   };
 
@@ -73,7 +81,7 @@ export default function Dashboard() {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(`${API_URL}/calls/${callId}/qa`, {
-        headers: getAuthHeaders()
+        credentials: 'include'  // ✅ Use cookies
       });
       const result = await response.json();
       setCallDetails(result);
@@ -84,22 +92,17 @@ export default function Dashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    router.push('/login');
-  };
-
-  const getUserInfo = () => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        return JSON.parse(userStr);
-      } catch {
-        return { name: 'User', role: '' };
-      }
+  const handleLogout = async () => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
     }
-    return { name: 'User', role: '' };
+    router.push('/login');
   };
 
   if (loading) {
@@ -131,8 +134,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  const user = getUserInfo();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-indigo-50/20">
@@ -196,10 +197,12 @@ export default function Dashboard() {
               >
                 Upload Calls
               </button>
-              <div className="text-right px-3">
-                <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-                <p className="text-xs text-gray-500 capitalize font-medium">{user.role}</p>
-              </div>
+              {user && (
+                <div className="text-right px-3">
+                  <p className="text-sm font-semibold text-gray-900">{user.name}</p>
+                  <p className="text-xs text-gray-500 capitalize font-medium">{user.role}</p>
+                </div>
+              )}
               <button
                 onClick={handleLogout}
                 className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-medium transition-all duration-200 shadow-md hover:shadow-lg"
