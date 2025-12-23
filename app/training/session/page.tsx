@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   LiveKitRoom,
   useVoiceAssistant,
@@ -26,6 +26,7 @@ interface Message {
 
 export default function TrainingSessionPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [connectionDetails, setConnectionDetails] = useState<{
     token: string;
     url: string;
@@ -41,32 +42,42 @@ export default function TrainingSessionPage() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      console.log('❌ No auth token found');
-      router.push('/login');
-      return;
-    }
-
-    // Get selected scenario from session storage
-    const scenarioId = sessionStorage.getItem('selected_training_scenario');
-    if (!scenarioId) {
-      console.log('❌ No scenario selected');
-      router.push('/training');
-      return;
-    }
-
-    console.log('✅ Starting session with scenario:', scenarioId);
-    setSelectedScenarioId(scenarioId);
-    startSession(scenarioId);
+    // ✅ NEW: Check cookie auth instead of localStorage
+    checkAuthAndStart();
   }, []);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
+  const checkAuthAndStart = async () => {
+    try {
+      // 1. Verify User is Logged In (Cookie Auth)
+      const authResponse = await fetch(`${API_URL}/auth/check`, {
+        credentials: 'include' // ✅ Send cookies
+      });
+      
+      if (!authResponse.ok) {
+        console.log('❌ Not authenticated');
+        router.push('/login');
+        return;
+      }
+
+      // 2. Get Scenario ID (from URL or SessionStorage)
+      const urlScenarioId = searchParams.get('scenarioId');
+      const storageScenarioId = sessionStorage.getItem('selected_training_scenario');
+      const scenarioId = urlScenarioId || storageScenarioId;
+
+      if (!scenarioId) {
+        console.log('❌ No scenario selected');
+        router.push('/training');
+        return;
+      }
+
+      console.log('✅ Starting session with scenario:', scenarioId);
+      setSelectedScenarioId(scenarioId);
+      startSession(scenarioId);
+
+    } catch (error) {
+      console.error('Auth check error:', error);
+      router.push('/login');
+    }
   };
 
   const startSession = async (scenarioId: string) => {
@@ -77,6 +88,7 @@ export default function TrainingSessionPage() {
 
     try {
       // Step 1: Get LiveKit token from LOCAL API route
+      // (This creates the room on LiveKit server)
       const livekitResponse = await fetch('/api/livekit-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,11 +108,16 @@ export default function TrainingSessionPage() {
         url: livekitData.url
       });
       
-      // Step 2: Create training session in QA SaaS backend
+      // Step 2: Create training session in Backend
       console.log('🔄 Step 2: Creating training session in backend...');
+      
+      // ✅ FIXED: Use cookie auth (credentials: 'include')
       const sessionResponse = await fetch(`${API_URL}/training/sessions/start`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        credentials: 'include', // ✅ Sends HttpOnly cookie
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           scenario_id: scenarioId,
           room_name: livekitData.roomName
@@ -110,7 +127,7 @@ export default function TrainingSessionPage() {
       if (!sessionResponse.ok) {
         const errorData = await sessionResponse.json();
         console.error('❌ Session creation failed:', errorData);
-        throw new Error('Failed to create training session');
+        throw new Error(errorData.detail || 'Failed to create training session');
       }
 
       const sessionData = await sessionResponse.json();
@@ -142,16 +159,6 @@ export default function TrainingSessionPage() {
     const duration = Math.floor((new Date().getTime() - sessionStartTime.getTime()) / 1000);
     const finalMessages = messages.filter(m => m.isFinal);
 
-    console.log('📊 Session details:', {
-      sessionId,
-      duration,
-      totalMessages: messages.length,
-      finalMessages: finalMessages.length,
-      selectedScenarioId
-    });
-
-    console.log('📝 Final messages:', finalMessages);
-
     try {
       // Generate evaluation using LOCAL API route
       console.log('🔄 Step 1: Calling evaluation API...');
@@ -172,11 +179,7 @@ export default function TrainingSessionPage() {
         })
       });
 
-      console.log('📥 Evaluation response status:', evaluationResponse.status);
-
       if (!evaluationResponse.ok) {
-        const errorText = await evaluationResponse.text();
-        console.error('❌ Evaluation API error:', errorText);
         throw new Error(`Evaluation failed: ${evaluationResponse.status}`);
       }
 
@@ -191,16 +194,16 @@ export default function TrainingSessionPage() {
         transcript: finalMessages,
         evaluation
       };
-      
-      console.log('📤 Save payload:', savePayload);
 
+      // ✅ FIXED: Use cookie auth (credentials: 'include')
       const saveResponse = await fetch(`${API_URL}/training/sessions/${sessionId}/complete`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        credentials: 'include', // ✅ Sends HttpOnly cookie
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(savePayload)
       });
-
-      console.log('📥 Save response status:', saveResponse.status);
 
       if (!saveResponse.ok) {
         const errorText = await saveResponse.text();
@@ -213,13 +216,11 @@ export default function TrainingSessionPage() {
 
       // Navigate to results page
       sessionStorage.setItem('training_session_id', sessionId.toString());
-      console.log('✅ Navigating to results page...');
       router.push('/training/results');
 
     } catch (err) {
       console.error('💥 Error ending session:', err);
-      console.error('Error stack:', err instanceof Error ? err.stack : 'No stack');
-      alert(`Failed to save training results: ${err instanceof Error ? err.message : 'Unknown error'}\n\nCheck console for details.`);
+      alert(`Failed to save training results: ${err instanceof Error ? err.message : 'Unknown error'}`);
       router.push('/training');
     }
   }, [messages, sessionId, sessionStartTime, selectedScenarioId, router, API_URL]);
@@ -282,7 +283,7 @@ export default function TrainingSessionPage() {
 }
 
 // ============================================
-// Active Session Component
+// Active Session Component (Helper)
 // ============================================
 interface ActiveSessionProps {
   sessionStartTime: Date | null;
@@ -342,7 +343,6 @@ function ActiveSession({
           };
           return updated;
         } else {
-          console.log('🤖 Agent message:', segment.text, `(final: ${segment.final})`);
           return [...prev, {
             id: messageId,
             role: 'assistant' as const,
@@ -377,7 +377,6 @@ function ActiveSession({
           };
           return updated;
         } else {
-          console.log('👤 User message:', segment.text, `(final: ${segment.final})`);
           return [...prev, {
             id: messageId,
             role: 'user' as const,
@@ -413,8 +412,6 @@ function ActiveSession({
 
   const status = getStatusDisplay();
   const displayMessages = messages.filter(m => m.content && m.content.trim() !== '');
-
-  console.log('📊 Current messages count:', displayMessages.length);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -491,10 +488,7 @@ function ActiveSession({
         {/* End Session Button */}
         <div className="flex justify-center">
           <button
-            onClick={() => {
-              console.log('🔴 End Session button clicked');
-              onEndSession();
-            }}
+            onClick={() => onEndSession()}
             className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-xl font-semibold transition-all shadow-lg"
           >
             <PhoneOff className="w-5 h-5" />
