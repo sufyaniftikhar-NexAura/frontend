@@ -20,13 +20,11 @@ export default function AnalyticsPage() {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
-    // ✅ Cookie-based auth - check auth status with backend
     checkAuthAndFetch();
   }, [period, router]);
 
   const checkAuthAndFetch = async () => {
     try {
-      // Check auth status
       const authResponse = await fetch(`${API_URL}/auth/check`, {
         credentials: 'include'  // ✅ Use cookies
       });
@@ -38,7 +36,7 @@ export default function AnalyticsPage() {
       
       const authData = await authResponse.json();
       setUser(authData.user);
-      
+
       // Only managers can access analytics
       if (authData.user.role !== 'manager') {
         alert('Only managers can access analytics');
@@ -108,7 +106,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50/20 to-purple-50/10">
-      {/* Header */}
+      {/* Header */}      
       <header className="bg-white/80 backdrop-blur-lg shadow-lg border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
@@ -165,7 +163,8 @@ export default function AnalyticsPage() {
                   </div>
                   <span className="text-sm font-medium text-gray-600">Total Calls</span>
                 </div>
-                <p className="text-3xl font-bold text-gray-900">{data.overview?.total_calls || 0}</p>
+                {/* FIX: Use data.summary instead of data.overview */}
+                <p className="text-3xl font-bold text-gray-900">{data.summary?.total_calls || 0}</p>
               </div>
 
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
@@ -175,7 +174,8 @@ export default function AnalyticsPage() {
                   </div>
                   <span className="text-sm font-medium text-gray-600">Avg Score</span>
                 </div>
-                <p className="text-3xl font-bold text-gray-900">{(data.overview?.average_score || 0).toFixed(1)}%</p>
+                {/* FIX: Use data.summary instead of data.overview */}
+                <p className="text-3xl font-bold text-gray-900">{(data.summary?.average_score || 0).toFixed(1)}%</p>
               </div>
 
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
@@ -185,7 +185,8 @@ export default function AnalyticsPage() {
                   </div>
                   <span className="text-sm font-medium text-gray-600">Active Agents</span>
                 </div>
-                <p className="text-3xl font-bold text-gray-900">{data.overview?.active_agents || 0}</p>
+                {/* FIX: Count agents array length instead of looking for active_agents prop */}
+                <p className="text-3xl font-bold text-gray-900">{data.agents?.length || 0}</p>
               </div>
 
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
@@ -193,9 +194,10 @@ export default function AnalyticsPage() {
                   <div className="p-2 bg-yellow-100 rounded-lg">
                     <Award className="w-5 h-5 text-yellow-600" />
                   </div>
-                  <span className="text-sm font-medium text-gray-600">Top Grade</span>
+                  <span className="text-sm font-medium text-gray-600">Best Score</span>
                 </div>
-                <p className="text-3xl font-bold text-gray-900">{data.overview?.top_grade || 'N/A'}</p>
+                {/* FIX: Use best_score from summary */}
+                <p className="text-3xl font-bold text-gray-900">{data.summary?.best_score || 'N/A'}</p>
               </div>
             </div>
 
@@ -206,8 +208,9 @@ export default function AnalyticsPage() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Grade Distribution</h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
+                    {/* FIX: Use data.grades instead of data.grade_distribution */}
                     <Pie
-                      data={data.grade_distribution || []}
+                      data={data.grades || []}
                       dataKey="count"
                       nameKey="grade"
                       cx="50%"
@@ -215,7 +218,7 @@ export default function AnalyticsPage() {
                       outerRadius={100}
                       label={({ grade, percent }) => `${grade}: ${(percent * 100).toFixed(0)}%`}
                     >
-                      {(data.grade_distribution || []).map((entry: GradeData, index: number) => (
+                      {(data.grades || []).map((entry: GradeData, index: number) => (
                         <Cell key={`cell-${index}`} fill={gradeColors[entry.grade] || COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -229,7 +232,8 @@ export default function AnalyticsPage() {
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Call Volume</h3>
                 <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={data.daily_trend || []}>
+                  {/* FIX: Use data.trend instead of data.daily_trend */}
+                  <LineChart data={data.trend || []}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                     <XAxis dataKey="date" stroke="#6B7280" fontSize={12} />
                     <YAxis stroke="#6B7280" fontSize={12} />
@@ -257,10 +261,12 @@ export default function AnalyticsPage() {
               <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100 lg:col-span-2">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Agent Performance</h3>
                 <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={data.agent_performance || []} layout="vertical">
+                  {/* FIX: Use data.agents instead of data.agent_performance */}
+                  <BarChart data={data.agents || []} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                     <XAxis type="number" domain={[0, 100]} stroke="#6B7280" fontSize={12} />
-                    <YAxis dataKey="agent_name" type="category" width={120} stroke="#6B7280" fontSize={12} />
+                    {/* FIX: Use 'agent' instead of 'agent_name' to match backend */}
+                    <YAxis dataKey="agent" type="category" width={120} stroke="#6B7280" fontSize={12} />
                     <Tooltip 
                       contentStyle={{ 
                         backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -269,8 +275,9 @@ export default function AnalyticsPage() {
                         boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                       }}
                     />
+                    {/* FIX: Use 'score' instead of 'avg_score' to match backend */}
                     <Bar 
-                      dataKey="avg_score" 
+                      dataKey="score" 
                       fill="#6366F1" 
                       radius={[0, 8, 8, 0]}
                       name="Avg Score"
