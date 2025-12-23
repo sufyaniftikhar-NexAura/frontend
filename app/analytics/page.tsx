@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, Users, Target, Award } from 'lucide-react';
+import { TrendingUp, Users, Target, Award, ArrowLeft } from 'lucide-react';
 
 interface GradeData {
   grade: string;
@@ -15,39 +15,49 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState(30);
+  const [user, setUser] = useState<any>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
-    
-    if (!token || !user) {
-      router.push('/login');
-      return;
-    }
-
-    const userData = JSON.parse(user);
-    if (userData.role !== 'manager') {
-      alert('Only managers can access analytics');
-      router.push('/');
-      return;
-    }
-
-    fetchAnalytics();
+    // ✅ Cookie-based auth - check auth status with backend
+    checkAuthAndFetch();
   }, [period, router]);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return {
-      'Authorization': `Bearer ${token}`
-    };
+  const checkAuthAndFetch = async () => {
+    try {
+      // Check auth status
+      const authResponse = await fetch(`${API_URL}/auth/check`, {
+        credentials: 'include'  // ✅ Use cookies
+      });
+      
+      if (!authResponse.ok) {
+        router.push('/login');
+        return;
+      }
+      
+      const authData = await authResponse.json();
+      setUser(authData.user);
+      
+      // Only managers can access analytics
+      if (authData.user.role !== 'manager') {
+        alert('Only managers can access analytics');
+        router.push('/');
+        return;
+      }
+
+      // Fetch analytics
+      fetchAnalytics();
+    } catch (error) {
+      console.error('Auth check error:', error);
+      router.push('/login');
+    }
   };
 
   const fetchAnalytics = async () => {
     try {
       const response = await fetch(`${API_URL}/analytics/dashboard?days=${period}`, {
-        headers: getAuthHeaders()
+        credentials: 'include'  // ✅ Use cookies
       });
 
       if (response.ok) {
@@ -63,8 +73,16 @@ export default function AnalyticsPage() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'  // ✅ Use cookies
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    localStorage.removeItem('user');
     router.push('/login');
   };
 
@@ -82,51 +100,51 @@ export default function AnalyticsPage() {
     );
   }
 
-  if (!data) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-red-600">Failed to load analytics</p>
-      </div>
-    );
-  }
-
-  const COLORS: Record<string, string> = {
-    A: '#10b981',
-    B: '#3b82f6',
-    C: '#f59e0b',
-    D: '#f97316',
-    F: '#ef4444'
+  const COLORS = ['#10B981', '#22C55E', '#84CC16', '#EAB308', '#F97316', '#EF4444'];
+  const gradeColors: Record<string, string> = {
+    'A+': '#059669', 'A': '#10B981', 'B+': '#22C55E', 'B': '#84CC16',
+    'C+': '#EAB308', 'C': '#F97316', 'D': '#EF4444', 'F': '#991B1B'
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-indigo-50/10">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50/20 to-purple-50/10">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-lg shadow-lg border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent">Analytics Dashboard</h1>
-              <p className="text-gray-600 mt-1 font-medium">Performance insights and trends</p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent">
+                  Analytics Dashboard
+                </h1>
+                <p className="text-gray-600 mt-1">Performance metrics and insights</p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <select
                 value={period}
                 onChange={(e) => setPeriod(Number(e.target.value))}
-                className="px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                className="px-4 py-2 border border-gray-200 rounded-xl bg-white/80 backdrop-blur-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
                 <option value={7}>Last 7 days</option>
                 <option value={30}>Last 30 days</option>
                 <option value={90}>Last 90 days</option>
               </select>
-              <button
-                onClick={() => router.push('/')}
-                className="px-5 py-2.5 bg-gradient-to-r from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 text-gray-800 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200"
-              >
-                ← Dashboard
-              </button>
+              {user && (
+                <div className="text-right px-3">
+                  <p className="text-sm font-semibold text-gray-900">{user.name}</p>
+                  <p className="text-xs text-gray-500 capitalize font-medium">{user.role}</p>
+                </div>
+              )}
               <button
                 onClick={handleLogout}
-                className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-200"
+                className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-medium transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 Logout
               </button>
@@ -136,154 +154,132 @@ export default function AnalyticsPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Calls</div>
-              <Target className="w-6 h-6 text-blue-600" />
+        {data && (
+          <>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600">Total Calls</span>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{data.overview?.total_calls || 0}</p>
+              </div>
+
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <Target className="w-5 h-5 text-green-600" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600">Avg Score</span>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{(data.overview?.average_score || 0).toFixed(1)}%</p>
+              </div>
+
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Users className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600">Active Agents</span>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{data.overview?.active_agents || 0}</p>
+              </div>
+
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-yellow-100 rounded-lg">
+                    <Award className="w-5 h-5 text-yellow-600" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-600">Top Grade</span>
+                </div>
+                <p className="text-3xl font-bold text-gray-900">{data.overview?.top_grade || 'N/A'}</p>
+              </div>
             </div>
-            <div className="text-3xl font-bold text-gray-900">{data.summary.total_calls}</div>
-          </div>
 
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-indigo-100">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Avg Score</div>
-              <TrendingUp className="w-6 h-6 text-indigo-600" />
+            {/* Charts Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Grade Distribution */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Grade Distribution</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={data.grade_distribution || []}
+                      dataKey="count"
+                      nameKey="grade"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label={({ grade, percent }) => `${grade}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {(data.grade_distribution || []).map((entry: GradeData, index: number) => (
+                        <Cell key={`cell-${index}`} fill={gradeColors[entry.grade] || COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Daily Trend */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Call Volume</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={data.daily_trend || []}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                    <XAxis dataKey="date" stroke="#6B7280" fontSize={12} />
+                    <YAxis stroke="#6B7280" fontSize={12} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        borderRadius: '12px',
+                        border: 'none',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="calls" 
+                      stroke="#6366F1" 
+                      strokeWidth={3}
+                      dot={{ fill: '#6366F1', strokeWidth: 2 }}
+                      activeDot={{ r: 6, fill: '#4F46E5' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Agent Performance */}
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100 lg:col-span-2">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Agent Performance</h3>
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={data.agent_performance || []} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                    <XAxis type="number" domain={[0, 100]} stroke="#6B7280" fontSize={12} />
+                    <YAxis dataKey="agent_name" type="category" width={120} stroke="#6B7280" fontSize={12} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        borderRadius: '12px',
+                        border: 'none',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <Bar 
+                      dataKey="avg_score" 
+                      fill="#6366F1" 
+                      radius={[0, 8, 8, 0]}
+                      name="Avg Score"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <div className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              {data.summary.average_score}%
-            </div>
-          </div>
-
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-green-100">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Best Score</div>
-              <Award className="w-6 h-6 text-green-600" />
-            </div>
-            <div className="text-3xl font-bold text-green-600">{data.summary.best_score}%</div>
-          </div>
-
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-orange-100">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Agents</div>
-              <Users className="w-6 h-6 text-orange-600" />
-            </div>
-            <div className="text-3xl font-bold text-orange-600">{data.agents.length}</div>
-          </div>
-        </div>
-
-        {/* Charts Row 1: Trend + Grades */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* QA Score Trend */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">QA Score Trend</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={data.trend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis domain={[0, 100]} />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={2} name="Avg Score" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Grade Distribution */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Grade Distribution</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={data.grades}
-                  dataKey="count"
-                  nameKey="grade"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  label={(entry: GradeData) => `${entry.grade}: ${entry.count}`}
-                >
-                  {data.grades.map((entry: GradeData, index: number) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[entry.grade] || '#999999'} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Charts Row 2: Agents + Categories */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Agent Performance */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Agent Performance</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data.agents}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="agent" tick={{ fontSize: 12 }} />
-                <YAxis domain={[0, 100]} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="score" fill="#6366f1" name="Avg Score" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Category Breakdown */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
-            <h3 className="text-xl font-bold text-gray-900 mb-6">Category Performance</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data.categories} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis type="number" domain={[0, 100]} />
-                <YAxis dataKey="category" type="category" width={120} tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="score" fill="#f59e0b" name="Avg Score" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Campaign Comparison Table */}
-        {data.campaigns.length > 0 && (
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden border border-gray-100">
-            <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-              <h3 className="text-2xl font-bold text-gray-900">Campaign Performance</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Campaign</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Calls</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Avg Score</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Success Rate</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white/50 divide-y divide-gray-200">
-                  {data.campaigns.map((campaign: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-indigo-50/50 transition-colors duration-200">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{campaign.campaign}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{campaign.calls}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 rounded-lg font-bold text-sm ${
-                          campaign.score >= 80 ? 'bg-green-100 text-green-700' :
-                          campaign.score >= 60 ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                          {campaign.score}%
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{campaign.success_rate}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          </>
         )}
       </main>
     </div>

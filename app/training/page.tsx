@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Brain, Trophy, TrendingUp, Target, Sparkles, Lock, Loader2 } from 'lucide-react';
+import { Brain, Trophy, TrendingUp, Target, Sparkles, Lock, Loader2, ArrowLeft } from 'lucide-react';
 
 interface Scenario {
   id: number;
@@ -23,31 +23,43 @@ export default function TrainingPortalPage() {
   const [defaultScenarios, setDefaultScenarios] = useState<Scenario[]>([]);
   const [personalizedScenarios, setPersonalizedScenarios] = useState<Scenario[]>([]);
   const [trainingStats, setTrainingStats] = useState<any>(null);
+  const [user, setUser] = useState<any>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    fetchData();
+    // ✅ Cookie-based auth
+    checkAuthAndFetch();
   }, []);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return {
-      'Authorization': `Bearer ${token}`
-    };
+  const checkAuthAndFetch = async () => {
+    try {
+      // Check auth status
+      const authResponse = await fetch(`${API_URL}/auth/check`, {
+        credentials: 'include'  // ✅ Use cookies
+      });
+      
+      if (!authResponse.ok) {
+        router.push('/login');
+        return;
+      }
+      
+      const authData = await authResponse.json();
+      setUser(authData.user);
+      
+      // Fetch training data
+      fetchData();
+    } catch (error) {
+      console.error('Auth check error:', error);
+      router.push('/login');
+    }
   };
 
   const fetchData = async () => {
     try {
       // Fetch scenarios
       const scenariosRes = await fetch(`${API_URL}/training/scenarios`, {
-        headers: getAuthHeaders()
+        credentials: 'include'  // ✅ Use cookies
       });
 
       if (scenariosRes.ok) {
@@ -58,7 +70,7 @@ export default function TrainingPortalPage() {
 
       // Fetch training progress
       const statsRes = await fetch(`${API_URL}/training/analytics/progress`, {
-        headers: getAuthHeaders()
+        credentials: 'include'  // ✅ Use cookies
       });
 
       if (statsRes.ok) {
@@ -78,84 +90,121 @@ export default function TrainingPortalPage() {
     try {
       const response = await fetch(`${API_URL}/training/scenarios/generate`, {
         method: 'POST',
-        headers: getAuthHeaders()
+        credentials: 'include'  // ✅ Use cookies
       });
 
       const data = await response.json();
 
       if (data.scenario_created) {
-        alert(`✅ ${data.message}\n\nNew scenario: ${data.scenario.name}`);
+        alert(`✅ ${data.message}`);
         fetchData(); // Refresh scenarios
       } else {
         alert(`ℹ️ ${data.message}`);
       }
-
     } catch (error) {
       console.error('Error generating scenario:', error);
-      alert('❌ Failed to generate personalized scenario');
+      alert('Failed to generate personalized scenario');
     } finally {
       setGenerating(false);
     }
   };
 
-  const handleStartTraining = (scenarioId: string) => {
-    // Save selected scenario and navigate to LiveKit training page
-    sessionStorage.setItem('selected_training_scenario', scenarioId);
-    router.push('/training/session');
+  const startTrainingSession = async (scenarioId: string) => {
+    try {
+      const response = await fetch(`${API_URL}/training/sessions/start`, {
+        method: 'POST',
+        credentials: 'include',  // ✅ Use cookies
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ scenario_id: scenarioId })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Navigate to session page with session ID
+        router.push(`/training/session?sessionId=${data.session_id}&scenarioId=${scenarioId}`);
+      } else {
+        const error = await response.json();
+        alert(error.detail || 'Failed to start session');
+      }
+    } catch (error) {
+      console.error('Error starting session:', error);
+      alert('Failed to start training session');
+    }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'  // ✅ Use cookies
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    localStorage.removeItem('user');
     router.push('/login');
+  };
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return 'bg-green-100 text-green-800';
+      case 'medium': return 'bg-yellow-100 text-yellow-800';
+      case 'hard': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-16 h-16 animate-spin text-indigo-600 mx-auto mb-4" />
+          <div className="relative inline-block">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 border-t-indigo-600 mx-auto mb-4"></div>
+            <div className="absolute inset-0 animate-ping rounded-full h-16 w-16 border-4 border-indigo-400 opacity-20"></div>
+          </div>
           <p className="text-gray-700 font-medium text-lg">Loading training portal...</p>
         </div>
       </div>
     );
   }
 
-  const getDifficultyBadge = (difficulty: string) => {
-    const colors = {
-      easy: 'bg-green-100 text-green-800',
-      medium: 'bg-yellow-100 text-yellow-800',
-      hard: 'bg-red-100 text-red-800'
-    };
-    return colors[difficulty as keyof typeof colors] || colors.medium;
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50/50 to-pink-50/30">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-lg shadow-lg border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <Brain className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent">
-                  Training Portal
-                </h1>
-                <p className="text-gray-600 mt-1 font-medium">Practice & Improve Your Skills</p>
+              <button
+                onClick={() => router.push('/')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg">
+                  <Brain className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-900 to-pink-900 bg-clip-text text-transparent">
+                    Training Portal
+                  </h1>
+                  <p className="text-gray-600 text-sm">Practice with AI customers</p>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => router.push('/')}
-                className="px-5 py-2.5 bg-gradient-to-r from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 text-gray-800 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200"
-              >
-                ← Dashboard
-              </button>
+              {user && (
+                <div className="text-right px-3">
+                  <p className="text-sm font-semibold text-gray-900">{user.name}</p>
+                  <p className="text-xs text-gray-500 capitalize font-medium">{user.role}</p>
+                </div>
+              )}
               <button
                 onClick={handleLogout}
-                className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-200"
+                className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-medium transition-all duration-200 shadow-md hover:shadow-lg"
               >
                 Logout
               </button>
@@ -165,154 +214,153 @@ export default function TrainingPortalPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        {/* Stats Cards */}
-        {trainingStats && trainingStats.total_sessions > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-indigo-100">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-semibold text-gray-600 uppercase">Total Sessions</div>
-                <Target className="w-6 h-6 text-indigo-600" />
+        {/* Stats Section */}
+        {trainingStats && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Target className="w-5 h-5 text-purple-600" />
+                </div>
+                <span className="text-sm font-medium text-gray-600">Sessions Completed</span>
               </div>
-              <div className="text-3xl font-bold text-indigo-600">{trainingStats.total_sessions}</div>
+              <p className="text-3xl font-bold text-gray-900">{trainingStats.sessions_completed || 0}</p>
             </div>
 
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-purple-100">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-semibold text-gray-600 uppercase">Avg Score</div>
-                <Trophy className="w-6 h-6 text-purple-600" />
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <TrendingUp className="w-5 h-5 text-green-600" />
+                </div>
+                <span className="text-sm font-medium text-gray-600">Average Score</span>
               </div>
-              <div className="text-3xl font-bold text-purple-600">{trainingStats.average_score}%</div>
+              <p className="text-3xl font-bold text-gray-900">{(trainingStats.average_score || 0).toFixed(0)}%</p>
             </div>
 
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-pink-100">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-semibold text-gray-600 uppercase">Latest Score</div>
-                <TrendingUp className="w-6 h-6 text-pink-600" />
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Trophy className="w-5 h-5 text-blue-600" />
+                </div>
+                <span className="text-sm font-medium text-gray-600">Best Score</span>
               </div>
-              <div className="text-3xl font-bold text-pink-600">{trainingStats.latest_score}%</div>
+              <p className="text-3xl font-bold text-gray-900">{trainingStats.best_score || 0}%</p>
+            </div>
+
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-yellow-100 rounded-lg">
+                  <Sparkles className="w-5 h-5 text-yellow-600" />
+                </div>
+                <span className="text-sm font-medium text-gray-600">Practice Time</span>
+              </div>
+              <p className="text-3xl font-bold text-gray-900">{trainingStats.total_practice_minutes || 0} min</p>
             </div>
           </div>
         )}
 
-        {/* Personalized Scenarios Section */}
+        {/* Default Scenarios */}
         <div className="mb-8">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Sparkles className="w-7 h-7 text-purple-600" />
-                Personalized Training
-              </h2>
-              <p className="text-gray-600 mt-1">Custom scenarios based on your QA performance</p>
-            </div>
-            <button
-              onClick={handleGeneratePersonalized}
-              disabled={generating}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 disabled:cursor-not-allowed"
-            >
-              {generating ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-5 h-5" />
-                  Generate New Scenario
-                </>
-              )}
-            </button>
-          </div>
-
-          {personalizedScenarios.length === 0 ? (
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-12 text-center border-2 border-dashed border-purple-300">
-              <Lock className="w-16 h-16 text-purple-400 mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-gray-900 mb-2">No Personalized Scenarios Yet</h3>
-              <p className="text-gray-600 mb-4">
-                Complete some QA calls first, then click "Generate New Scenario" to create custom training based on your performance.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {personalizedScenarios.map((scenario) => (
-                <div
-                  key={scenario.id}
-                  className="bg-gradient-to-br from-white to-purple-50/30 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden border border-purple-200"
-                >
-                  <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${getDifficultyBadge(scenario.difficulty)}`}>
-                        {scenario.difficulty}
-                      </span>
-                      <Sparkles className="w-5 h-5 text-white" />
-                    </div>
-                    <h3 className="text-xl font-bold text-white">{scenario.name}</h3>
-                    <p className="text-purple-100 text-sm" dir="rtl">{scenario.name_urdu}</p>
-                  </div>
-                  <div className="p-6">
-                    <p className="text-gray-700 text-sm mb-4">{scenario.description}</p>
-                    {scenario.based_on_calls && scenario.based_on_calls > 0 && (
-                      <p className="text-xs text-purple-600 mb-4 flex items-center gap-1">
-                        <Target className="w-4 h-4" />
-                        Based on {scenario.based_on_calls} QA call{scenario.based_on_calls > 1 ? 's' : ''}
-                      </p>
-                    )}
-                    <button
-                      onClick={() => handleStartTraining(scenario.scenario_id)}
-                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200"
-                    >
-                      Start Training
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Default Scenarios Section */}
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-            <Trophy className="w-7 h-7 text-indigo-600" />
-            Standard Training Scenarios
-          </h2>
-
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Standard Scenarios</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {defaultScenarios.map((scenario) => (
               <div
                 key={scenario.id}
-                className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-200 overflow-hidden border border-gray-200"
+                className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
               >
-                <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${getDifficultyBadge(scenario.difficulty)}`}>
-                      {scenario.difficulty}
-                    </span>
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">{scenario.name}</h3>
+                    <p className="text-sm text-gray-500">{scenario.name_urdu}</p>
                   </div>
-                  <h3 className="text-xl font-bold text-white">{scenario.name}</h3>
-                  <p className="text-blue-100 text-sm" dir="rtl">{scenario.name_urdu}</p>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(scenario.difficulty)}`}>
+                    {scenario.difficulty}
+                  </span>
                 </div>
-                <div className="p-6">
-                  <p className="text-gray-700 text-sm mb-4">{scenario.description}</p>
-                  <button
-                    onClick={() => handleStartTraining(scenario.scenario_id)}
-                    className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white py-3 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200"
-                  >
-                    Start Training
-                  </button>
-                </div>
+                <p className="text-gray-600 text-sm mb-4">{scenario.description}</p>
+                <button
+                  onClick={() => startTrainingSession(scenario.scenario_id)}
+                  className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-xl font-medium transition-all duration-200"
+                >
+                  Start Practice
+                </button>
               </div>
             ))}
           </div>
         </div>
 
-        {/* View History Button */}
-        <div className="mt-12 text-center">
-          <button
-            onClick={() => router.push('/training/history')}
-            className="px-8 py-4 bg-white hover:bg-gray-50 text-gray-800 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 border-2 border-gray-200"
-          >
-            View Training History →
-          </button>
+        {/* Personalized Scenarios */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">Personalized Scenarios</h2>
+            <button
+              onClick={handleGeneratePersonalized}
+              disabled={generating}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {generating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  Generate New
+                </>
+              )}
+            </button>
+          </div>
+          
+          {personalizedScenarios.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {personalizedScenarios.map((scenario) => (
+                <div
+                  key={scenario.id}
+                  className="bg-gradient-to-br from-indigo-50 to-purple-50 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-indigo-100 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Sparkles className="w-4 h-4 text-indigo-600" />
+                        <span className="text-xs font-medium text-indigo-600">Personalized</span>
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900">{scenario.name}</h3>
+                    </div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(scenario.difficulty)}`}>
+                      {scenario.difficulty}
+                    </span>
+                  </div>
+                  <p className="text-gray-600 text-sm mb-2">{scenario.description}</p>
+                  {scenario.based_on_calls && (
+                    <p className="text-xs text-indigo-600 mb-4">Based on {scenario.based_on_calls} of your calls</p>
+                  )}
+                  <button
+                    onClick={() => startTrainingSession(scenario.scenario_id)}
+                    className="w-full px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-medium transition-all duration-200"
+                  >
+                    Start Practice
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-8 text-center border border-gray-100">
+              <Lock className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Personalized Scenarios Yet</h3>
+              <p className="text-gray-600 mb-4">
+                Complete more QA evaluations to unlock AI-generated scenarios based on your specific improvement areas.
+              </p>
+              <button
+                onClick={handleGeneratePersonalized}
+                disabled={generating}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium"
+              >
+                <Sparkles className="w-4 h-4" />
+                Generate Scenario
+              </button>
+            </div>
+          )}
         </div>
       </main>
     </div>

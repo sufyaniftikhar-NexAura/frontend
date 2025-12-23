@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, Loader2, ArrowLeft, FileAudio, Archive, FileSpreadsheet } from 'lucide-react';
 
 interface UploadStatus {
   file: File;
@@ -22,7 +22,7 @@ interface Agent {
 export default function UploadPage() {
   const router = useRouter();
   const [files, setFiles] = useState<UploadStatus[]>([]);
-  const [campaign, setCampaign] = useState('test');
+  const [campaign, setCampaign] = useState('');
   const [agentId, setAgentId] = useState<number | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -36,37 +36,51 @@ export default function UploadPage() {
   const [qaConfigs, setQaConfigs] = useState<Array<{id: number, name: string}>>([]);
   const [selectedQaConfigId, setSelectedQaConfigId] = useState<number | null>(null);
   const [bulkQaConfigId, setBulkQaConfigId] = useState<number | null>(null);
+  const [user, setUser] = useState<any>(null);
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-    fetchAgents();
-    fetchQaConfigs();
+    // ✅ Cookie-based auth
+    checkAuthAndFetch();
   }, [router]);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    return {
-      'Authorization': `Bearer ${token}`
-    };
+  const checkAuthAndFetch = async () => {
+    try {
+      // Check auth status
+      const authResponse = await fetch(`${API_URL}/auth/check`, {
+        credentials: 'include'  // ✅ Use cookies
+      });
+      
+      if (!authResponse.ok) {
+        router.push('/login');
+        return;
+      }
+      
+      const authData = await authResponse.json();
+      setUser(authData.user);
+      
+      // Fetch agents and QA configs
+      fetchAgents();
+      fetchQaConfigs();
+    } catch (error) {
+      console.error('Auth check error:', error);
+      router.push('/login');
+    }
   };
 
   const fetchAgents = async () => {
     try {
-      const response = await fetch(`${API_URL}/auth/agents/list`, {
-        headers: getAuthHeaders()
+      const response = await fetch(`${API_URL}/auth/agents`, {
+        credentials: 'include'  // ✅ Use cookies
       });
       
       if (response.ok) {
         const data = await response.json();
-        setAgents(data.agents);
-        if (data.agents.length > 0) {
+        setAgents(data.agents || []);
+        if (data.agents && data.agents.length > 0) {
           setAgentId(data.agents[0].id);
+          setBulkAgentId(data.agents[0].id);
         }
       }
     } catch (error) {
@@ -77,13 +91,13 @@ export default function UploadPage() {
   const fetchQaConfigs = async () => {
     try {
       const response = await fetch(`${API_URL}/qa-configs/list`, {
-        headers: getAuthHeaders()
+        credentials: 'include'  // ✅ Use cookies
       });
 
       if (response.ok) {
         const data = await response.json();
-        setQaConfigs(data.configs);
-        const defaultConfig = data.configs.find((c: any) => c.is_default);
+        setQaConfigs(data.configs || []);
+        const defaultConfig = data.configs?.find((c: any) => c.is_default);
         if (defaultConfig) {
           setSelectedQaConfigId(defaultConfig.id);
           setBulkQaConfigId(defaultConfig.id);
@@ -94,327 +108,353 @@ export default function UploadPage() {
     }
   };
 
-  const handleFileSelect = (selectedFiles: FileList | null) => {
-    if (!selectedFiles) return;
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
 
-    const newFiles: UploadStatus[] = Array.from(selectedFiles).map(file => ({
-      file,
-      status: 'pending',
-      progress: 0
-    }));
-
-    setFiles(prev => [...prev, ...newFiles]);
+  const handleDragLeave = () => {
+    setIsDragging(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    handleFileSelect(e.dataTransfer.files);
+    const droppedFiles = Array.from(e.dataTransfer.files).filter(
+      (f) => f.type.includes('audio')
+    );
+    addFiles(droppedFiles);
   };
 
-  const pollTaskStatus = async (taskId: string, fileIndex: number) => {
-    const pollInterval = setInterval(async () => {
-      try {
-        const response = await fetch(`${API_URL}/calls/task/${taskId}`, {
-          headers: getAuthHeaders()
-        });
-        
-        if (!response.ok) {
-          clearInterval(pollInterval);
-          setFiles(prev => prev.map((f, i) => 
-            i === fileIndex ? { 
-              ...f, 
-              status: 'error', 
-              message: 'Failed to check status' 
-            } : f
-          ));
-          return;
-        }
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const selectedFiles = Array.from(e.target.files);
+      addFiles(selectedFiles);
+    }
+  };
 
-        const data = await response.json();
-        
-        setFiles(prev => prev.map((f, i) => 
-          i === fileIndex ? {
-            ...f,
-            progress: data.progress || 0,
-            message: data.message || ''
-          } : f
-        ));
-
-        if (data.status === 'completed') {
-          clearInterval(pollInterval);
-          setFiles(prev => prev.map((f, i) => 
-            i === fileIndex ? {
-              ...f,
-              status: 'success',
-              progress: 100,
-              callId: data.result?.call_id,
-              message: `QA Score: ${data.result?.qa_score || 'Processing...'}%`
-            } : f
-          ));
-        } else if (data.status === 'failed') {
-          clearInterval(pollInterval);
-          setFiles(prev => prev.map((f, i) => 
-            i === fileIndex ? {
-              ...f,
-              status: 'error',
-              progress: 0,
-              message: data.message || 'Processing failed'
-            } : f
-          ));
-        }
-      } catch (error) {
-        console.error('Polling error:', error);
-      }
-    }, 2000); // Poll every 2 seconds
+  const addFiles = (newFiles: File[]) => {
+    const fileStatuses: UploadStatus[] = newFiles.map((file) => ({
+      file,
+      status: 'pending',
+      progress: 0,
+    }));
+    setFiles((prev) => [...prev, ...fileStatuses]);
   };
 
   const uploadFile = async (fileStatus: UploadStatus, index: number) => {
     if (!agentId) {
-      setFiles(prev => prev.map((f, i) => 
-        i === index ? { 
-          ...f, 
-          status: 'error', 
-          message: 'Please select an agent' 
-        } : f
-      ));
+      setFiles((prev) => {
+        const updated = [...prev];
+        updated[index] = { ...updated[index], status: 'error', message: 'Please select an agent' };
+        return updated;
+      });
       return;
     }
 
-    const formData = new FormData();
-    formData.append('file', fileStatus.file);
+    // Update status to uploading
+    setFiles((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], status: 'uploading', progress: 0 };
+      return updated;
+    });
 
     try {
-      setFiles(prev => prev.map((f, i) => 
-        i === index ? { ...f, status: 'uploading', progress: 10 } : f
-      ));
+      const formData = new FormData();
+      formData.append('file', fileStatus.file);
+      formData.append('agent_id', agentId.toString());
+      formData.append('campaign', campaign || 'Default Campaign');
+      if (selectedQaConfigId) {
+        formData.append('qa_config_id', selectedQaConfigId.toString());
+      }
 
-      const response = await fetch(
-        `${API_URL}/calls/upload?agent_id=${agentId}&campaign=${campaign}&qa_config_id=${selectedQaConfigId}`,
-        {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: formData
-        }
-      );
-
-      const result = await response.json();
+      const response = await fetch(`${API_URL}/calls/upload`, {
+        method: 'POST',
+        credentials: 'include',  // ✅ Use cookies
+        body: formData,
+        // Note: Don't set Content-Type header for FormData - browser sets it with boundary
+      });
 
       if (response.ok) {
-        const taskId = result.task_id;
-        
-        setFiles(prev => prev.map((f, i) => 
-          i === index ? {
-            ...f,
+        const data = await response.json();
+        setFiles((prev) => {
+          const updated = [...prev];
+          updated[index] = {
+            ...updated[index],
             status: 'processing',
-            progress: 20,
-            taskId,
-            message: 'Processing...'
-          } : f
-        ));
-
+            taskId: data.task_id,
+            callId: data.call_id,
+            message: 'Processing...',
+          };
+          return updated;
+        });
         // Start polling for status
-        pollTaskStatus(taskId, index);
+        pollTaskStatus(data.task_id, index);
       } else {
-        throw new Error(result.detail || 'Upload failed');
+        const error = await response.json();
+        setFiles((prev) => {
+          const updated = [...prev];
+          updated[index] = {
+            ...updated[index],
+            status: 'error',
+            message: error.detail || 'Upload failed',
+          };
+          return updated;
+        });
       }
-    } catch (error: any) {
-      setFiles(prev => prev.map((f, i) => 
-        i === index ? { 
-          ...f, 
-          status: 'error', 
-          progress: 0,
-          message: error.message 
-        } : f
-      ));
+    } catch (error) {
+      setFiles((prev) => {
+        const updated = [...prev];
+        updated[index] = {
+          ...updated[index],
+          status: 'error',
+          message: 'Network error',
+        };
+        return updated;
+      });
     }
   };
 
-  const handleUploadAll = async () => {
-    const pendingFiles = files
-      .map((f, i) => ({ file: f, index: i }))
-      .filter(({ file }) => file.status === 'pending');
+  const pollTaskStatus = async (taskId: string, index: number) => {
+    const poll = async () => {
+      try {
+        const response = await fetch(`${API_URL}/calls/task/${taskId}`, {
+          credentials: 'include'  // ✅ Use cookies
+        });
 
-    for (const { file, index } of pendingFiles) {
-      await uploadFile(file, index);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'completed') {
+            setFiles((prev) => {
+              const updated = [...prev];
+              updated[index] = {
+                ...updated[index],
+                status: 'success',
+                message: `Score: ${data.result?.qa_score || 'N/A'}`,
+              };
+              return updated;
+            });
+          } else if (data.status === 'failed') {
+            setFiles((prev) => {
+              const updated = [...prev];
+              updated[index] = {
+                ...updated[index],
+                status: 'error',
+                message: data.error || 'Processing failed',
+              };
+              return updated;
+            });
+          } else {
+            // Still processing, poll again
+            setTimeout(poll, 3000);
+          }
+        }
+      } catch (error) {
+        console.error('Error polling task status:', error);
+      }
+    };
+    poll();
+  };
+
+  const uploadAllFiles = async () => {
+    for (let i = 0; i < files.length; i++) {
+      if (files[i].status === 'pending') {
+        await uploadFile(files[i], i);
+      }
     }
   };
 
   const handleBulkUpload = async () => {
-    if (!bulkZipFile) {
-      alert('Please select a ZIP file');
+    if (!bulkZipFile || !bulkCsvFile) {
+      alert('Please select both ZIP and CSV files');
       return;
     }
 
-    if (!bulkCsvFile && !bulkAgentId) {
-      alert('Please either upload a CSV file or select a default agent');
+    if (!bulkAgentId) {
+      alert('Please select a default agent');
       return;
+    }
+
+    const formData = new FormData();
+    formData.append('zip_file', bulkZipFile);
+    formData.append('csv_file', bulkCsvFile);
+    formData.append('default_agent_id', bulkAgentId.toString());
+    formData.append('default_campaign', bulkCampaign);
+    if (bulkQaConfigId) {
+      formData.append('qa_config_id', bulkQaConfigId.toString());
     }
 
     try {
-      const formData = new FormData();
-      formData.append('zip_file', bulkZipFile);
-      
-      if (bulkCsvFile) {
-        formData.append('csv_file', bulkCsvFile);
-      }
-
-      const params = new URLSearchParams();
-      if (bulkAgentId) {
-        params.append('default_agent_id', bulkAgentId.toString());
-      }
-      if (bulkCampaign) {
-        params.append('default_campaign', bulkCampaign);
-      }
-      if (bulkQaConfigId) {
-        params.append('qa_config_id', bulkQaConfigId.toString());
-      }
-
-      const response = await fetch(
-        `${API_URL}/calls/bulk-upload?${params.toString()}`,
-        {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: formData
-        }
-      );
-
-      const result = await response.json();
+      const response = await fetch(`${API_URL}/calls/bulk-upload`, {
+        method: 'POST',
+        credentials: 'include',  // ✅ Use cookies
+        body: formData,
+      });
 
       if (response.ok) {
-        setBulkTaskId(result.task_id);
-        // Start polling for bulk status
-        pollBulkStatus(result.task_id);
+        const data = await response.json();
+        setBulkTaskId(data.task_id);
+        pollBulkStatus(data.task_id);
       } else {
-        throw new Error(result.detail || 'Bulk upload failed');
+        const error = await response.json();
+        alert(error.detail || 'Bulk upload failed');
       }
-    } catch (error: any) {
-      alert(`Error: ${error.message}`);
+    } catch (error) {
+      console.error('Bulk upload error:', error);
+      alert('Network error during bulk upload');
     }
   };
 
-  const pollBulkStatus = (taskId: string) => {
-    const pollInterval = setInterval(async () => {
+  const pollBulkStatus = async (taskId: string) => {
+    const poll = async () => {
       try {
-        const response = await fetch(`${API_URL}/calls/task/${taskId}`, {
-          headers: getAuthHeaders()
+        const response = await fetch(`${API_URL}/calls/bulk-task/${taskId}`, {
+          credentials: 'include'  // ✅ Use cookies
         });
-        
-        if (!response.ok) {
-          clearInterval(pollInterval);
-          return;
-        }
 
-        const data = await response.json();
-        setBulkStatus(data);
-
-        if (data.status === 'completed') {
-          clearInterval(pollInterval);
-          alert(`Success! Processed ${data.result?.successful || 0} files`);
-        } else if (data.status === 'failed') {
-          clearInterval(pollInterval);
-          alert(`Failed: ${data.message}`);
+        if (response.ok) {
+          const data = await response.json();
+          setBulkStatus(data);
+          
+          if (data.status !== 'completed' && data.status !== 'failed') {
+            setTimeout(poll, 3000);
+          }
         }
       } catch (error) {
-        console.error('Bulk polling error:', error);
+        console.error('Error polling bulk status:', error);
       }
-    }, 2000);
+    };
+    poll();
   };
 
-  const clearCompleted = () => {
-    setFiles(prev => prev.filter(f => f.status === 'pending' || f.status === 'uploading' || f.status === 'processing'));
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'  // ✅ Use cookies
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    localStorage.removeItem('user');
+    router.push('/login');
   };
 
-  const pendingCount = files.filter(f => f.status === 'pending').length;
-  const successCount = files.filter(f => f.status === 'success').length;
-  const errorCount = files.filter(f => f.status === 'error').length;
-  const processingCount = files.filter(f => f.status === 'processing').length;
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50/20 to-purple-50/10">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-indigo-50/10">
+      {/* Header */}
       <header className="bg-white/80 backdrop-blur-lg shadow-lg border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent">Upload Calls</h1>
-              <p className="text-gray-600 mt-1 font-medium">Upload audio files for QA evaluation</p>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => router.push('/')}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl shadow-lg">
+                  <Upload className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent">
+                    Upload Calls
+                  </h1>
+                  <p className="text-gray-600 text-sm">Upload and process call recordings</p>
+                </div>
+              </div>
             </div>
-            <button
-              onClick={() => router.push('/')}
-              className="px-6 py-3 bg-gradient-to-r from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 text-gray-800 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
-            >
-              ← Back to Dashboard
-            </button>
+            <div className="flex items-center gap-3">
+              {user && (
+                <div className="text-right px-3">
+                  <p className="text-sm font-semibold text-gray-900">{user.name}</p>
+                  <p className="text-xs text-gray-500 capitalize font-medium">{user.role}</p>
+                </div>
+              )}
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-medium transition-all duration-200 shadow-md hover:shadow-lg"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
       </header>
-  
-      <main className="max-w-7xl mx-auto px-4 py-10 sm:px-6 lg:px-8">
-        <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg mb-8 border border-gray-100">
-          <div className="border-b border-gray-200">
-            <nav className="flex -mb-px">
-              <button
-                onClick={() => setUploadMode('single')}
-                className={`px-8 py-4 text-base font-semibold border-b-3 transition-all duration-200 ${
-                  uploadMode === 'single'
-                    ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
-                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                Single/Multiple Files
-              </button>
-              <button
-                onClick={() => setUploadMode('bulk')}
-                className={`px-8 py-4 text-base font-semibold border-b-3 transition-all duration-200 ${
-                  uploadMode === 'bulk'
-                    ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50'
-                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                Bulk Upload (ZIP + CSV)
-              </button>
-            </nav>
-          </div>
+
+      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        {/* Mode Selection */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg mb-8 border border-gray-100">
+          <nav className="flex">
+            <button
+              onClick={() => setUploadMode('single')}
+              className={`flex-1 px-6 py-4 text-center font-medium transition-all ${
+                uploadMode === 'single'
+                  ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <FileAudio className="w-5 h-5 mx-auto mb-1" />
+              Single/Multiple Files
+            </button>
+            <button
+              onClick={() => setUploadMode('bulk')}
+              className={`flex-1 px-6 py-4 text-center font-medium transition-all ${
+                uploadMode === 'bulk'
+                  ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Archive className="w-5 h-5 mx-auto mb-1" />
+              Bulk Upload (ZIP + CSV)
+            </button>
+          </nav>
         </div>
-              
+
         {uploadMode === 'single' ? (
           <>
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 mb-8 border border-gray-100">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Upload Settings</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Settings */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 mb-8 border border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Upload Settings</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Select Agent
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Agent</label>
                   <select
                     value={agentId || ''}
                     onChange={(e) => setAgentId(Number(e.target.value))}
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
-                    <option value="">Select an agent...</option>
+                    <option value="">Select agent...</option>
                     {agents.map((agent) => (
                       <option key={agent.id} value={agent.id}>
-                        {agent.name} ({agent.email})
+                        {agent.name}
                       </option>
                     ))}
                   </select>
-                  {agents.length === 0 && (
-                    <p className="text-sm text-gray-600 mt-2 font-medium">
-                      No agents found. Create agents in Team Management first.
-                    </p>
-                  )}
                 </div>
-
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    QA Rubric
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Campaign</label>
+                  <input
+                    type="text"
+                    value={campaign}
+                    onChange={(e) => setCampaign(e.target.value)}
+                    placeholder="Campaign name"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">QA Config</label>
                   <select
                     value={selectedQaConfigId || ''}
-                    onChange={(e) => setSelectedQaConfigId(Number(e.target.value))}
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
+                    onChange={(e) => setSelectedQaConfigId(Number(e.target.value) || null)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
-                    <option value="">Select rubric...</option>
+                    <option value="">Default config</option>
                     {qaConfigs.map((config) => (
                       <option key={config.id} value={config.id}>
                         {config.name}
@@ -422,147 +462,94 @@ export default function UploadPage() {
                     ))}
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Campaign
-                  </label>
-                  <input
-                    type="text"
-                    value={campaign}
-                    onChange={(e) => setCampaign(e.target.value)}
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
-                  />
-                </div>
               </div>
             </div>
-                
+
+            {/* Drop Zone */}
             <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
-              className={`border-3 border-dashed rounded-3xl p-16 text-center mb-8 transition-all duration-300 ${
-                isDragging
-                  ? 'border-indigo-600 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-xl scale-105'
-                  : 'border-gray-300 bg-white/90 backdrop-blur-sm hover:border-indigo-400 hover:shadow-lg shadow-md'
+              className={`bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-12 mb-8 border-2 border-dashed transition-all ${
+                isDragging ? 'border-indigo-500 bg-indigo-50/50' : 'border-gray-300'
               }`}
             >
-              <div className={`transition-transform duration-300 ${isDragging ? 'scale-110' : ''}`}>
-                <Upload className={`w-20 h-20 mx-auto mb-6 ${isDragging ? 'text-indigo-600' : 'text-gray-400'}`} />
+              <div className="text-center">
+                <Upload className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Drop audio files here</h3>
+                <p className="text-gray-600 mb-4">or click to browse</p>
+                <label className="inline-block">
+                  <input
+                    type="file"
+                    multiple
+                    accept="audio/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                  <span className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-medium cursor-pointer transition-all">
+                    Select Files
+                  </span>
+                </label>
               </div>
-              <p className="text-2xl font-bold text-gray-900 mb-3">
-                Drop audio files here
-              </p>
-              <p className="text-gray-600 mb-6 text-lg">
-                or click to browse
-              </p>
-              <input
-                type="file"
-                multiple
-                accept="audio/*"
-                onChange={(e) => handleFileSelect(e.target.files)}
-                className="hidden"
-                id="file-input"
-              />
-              <label
-                htmlFor="file-input"
-                className="inline-block px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 cursor-pointer font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-              >
-                Select Files
-              </label>
-              <p className="text-sm text-gray-600 mt-6 font-medium">
-                Supports: WAV, MP3, M4A, FLAC
-              </p>
             </div>
-            
-            {files.length > 0 && (
-              <div className="grid grid-cols-4 gap-6 mb-8">
-                <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-200 border border-gray-100">
-                  <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Files</div>
-                  <div className="text-3xl font-bold text-gray-900 mt-2">{files.length}</div>
-                </div>
-                <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-200 border border-orange-100">
-                  <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Pending</div>
-                  <div className="text-3xl font-bold text-orange-600 mt-2">{pendingCount}</div>
-                </div>
-                <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-200 border border-blue-100">
-                  <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Processing</div>
-                  <div className="text-3xl font-bold text-blue-600 mt-2">{processingCount}</div>
-                </div>
-                <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all duration-200 border border-green-100">
-                  <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Complete</div>
-                  <div className="text-3xl font-bold text-green-600 mt-2">{successCount}</div>
-                </div>
-              </div>
-            )}
 
+            {/* File List */}
             {files.length > 0 && (
-              <div className="flex gap-4 mb-8">
-                <button
-                  onClick={handleUploadAll}
-                  disabled={pendingCount === 0 || !agentId}
-                  className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:transform-none"
-                >
-                  Upload {pendingCount} File{pendingCount !== 1 ? 's' : ''}
-                </button>
-                {successCount > 0 && (
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold text-gray-900">Files ({files.length})</h2>
                   <button
-                    onClick={clearCompleted}
-                    className="px-8 py-4 bg-gradient-to-r from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 text-gray-800 rounded-xl font-semibold shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+                    onClick={uploadAllFiles}
+                    disabled={!agentId || files.every((f) => f.status !== 'pending')}
+                    className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Clear Completed
+                    Upload All
                   </button>
-                )}
-              </div>
-            )}
-  
-            {files.length > 0 && (
-              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden border border-gray-100">
-                <div className="px-8 py-6 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-                  <h2 className="text-2xl font-bold text-gray-900">Files</h2>
                 </div>
-                <div className="divide-y divide-gray-200">
+                <div className="space-y-3">
                   {files.map((fileStatus, index) => (
-                    <div key={index} className="px-8 py-6 hover:bg-indigo-50/30 transition-colors duration-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-4 flex-1">
-                          {fileStatus.status === 'pending' && (
-                            <div className="w-6 h-6 rounded-full border-3 border-gray-300" />
-                          )}
-                          {(fileStatus.status === 'uploading' || fileStatus.status === 'processing') && (
-                            <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
-                          )}
-                          {fileStatus.status === 'success' && (
-                            <CheckCircle className="w-6 h-6 text-green-600" />
-                          )}
-                          {fileStatus.status === 'error' && (
-                            <XCircle className="w-6 h-6 text-red-600" />
-                          )}
-                          <div className="flex-1">
-                            <p className="font-bold text-gray-900 text-lg">{fileStatus.file.name}</p>
-                            <p className="text-sm text-gray-600 mt-1 font-medium">
-                              {(fileStatus.file.size / 1024 / 1024).toFixed(2)} MB
-                              {fileStatus.message && ` • ${fileStatus.message}`}
-                            </p>
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-xl"
+                    >
+                      <div className="flex items-center gap-3">
+                        <FileAudio className="w-5 h-5 text-gray-400" />
+                        <span className="font-medium text-gray-900">{fileStatus.file.name}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {fileStatus.status === 'pending' && (
+                          <span className="text-sm text-gray-500">Ready</span>
+                        )}
+                        {fileStatus.status === 'uploading' && (
+                          <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+                        )}
+                        {fileStatus.status === 'processing' && (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="w-5 h-5 text-yellow-600 animate-spin" />
+                            <span className="text-sm text-yellow-600">Processing...</span>
                           </div>
-                        </div>
-                        {fileStatus.callId && (
+                        )}
+                        {fileStatus.status === 'success' && (
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="w-5 h-5 text-green-600" />
+                            <span className="text-sm text-green-600">{fileStatus.message}</span>
+                          </div>
+                        )}
+                        {fileStatus.status === 'error' && (
+                          <div className="flex items-center gap-2">
+                            <XCircle className="w-5 h-5 text-red-600" />
+                            <span className="text-sm text-red-600">{fileStatus.message}</span>
+                          </div>
+                        )}
+                        {fileStatus.status === 'pending' && (
                           <button
-                            onClick={() => router.push(`/?view=${fileStatus.callId}`)}
-                            className="text-indigo-600 hover:text-indigo-900 font-semibold text-sm hover:underline underline-offset-2 transition-all duration-200"
+                            onClick={() => removeFile(index)}
+                            className="p-1 text-gray-400 hover:text-red-600"
                           >
-                            View QA →
+                            <XCircle className="w-5 h-5" />
                           </button>
                         )}
                       </div>
-                      {(fileStatus.status === 'uploading' || fileStatus.status === 'processing') && (
-                        <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                          <div
-                            className="bg-gradient-to-r from-indigo-500 to-purple-600 h-3 rounded-full transition-all duration-300"
-                            style={{ width: `${fileStatus.progress}%` }}
-                          ></div>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -570,155 +557,156 @@ export default function UploadPage() {
             )}
           </>
         ) : (
-          <>
-            {/* BULK UPLOAD MODE - Keep existing bulk upload UI */}
-            <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 mb-8 border border-gray-100">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Bulk Upload Settings</h2>
-              
-              <div className="space-y-6">
+          /* Bulk Upload Mode */
+          <div className="space-y-6">
+            {/* Bulk Settings */}
+            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Bulk Upload Settings</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    ZIP File (Required)
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Default Agent</label>
+                  <select
+                    value={bulkAgentId || ''}
+                    onChange={(e) => setBulkAgentId(Number(e.target.value))}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <option value="">Select agent...</option>
+                    {agents.map((agent) => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Campaign</label>
+                  <input
+                    type="text"
+                    value={bulkCampaign}
+                    onChange={(e) => setBulkCampaign(e.target.value)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">QA Config</label>
+                  <select
+                    value={bulkQaConfigId || ''}
+                    onChange={(e) => setBulkQaConfigId(Number(e.target.value) || null)}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <option value="">Default config</option>
+                    {qaConfigs.map((config) => (
+                      <option key={config.id} value={config.id}>
+                        {config.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* File Selection */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+                <div className="flex items-center gap-3 mb-4">
+                  <Archive className="w-6 h-6 text-indigo-600" />
+                  <h3 className="text-lg font-bold text-gray-900">ZIP File</h3>
+                </div>
+                <label className="block">
                   <input
                     type="file"
                     accept=".zip"
                     onChange={(e) => setBulkZipFile(e.target.files?.[0] || null)}
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
+                    className="hidden"
                   />
-                  <p className="text-sm text-gray-600 mt-2 font-medium">
-                    Upload a ZIP file containing audio files (.wav, .mp3, .m4a, .flac)
-                  </p>
-                </div>
+                  <div className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                    bulkZipFile ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-indigo-500'
+                  }`}>
+                    {bulkZipFile ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <span className="font-medium text-green-700">{bulkZipFile.name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-600">Click to select ZIP file</span>
+                    )}
+                  </div>
+                </label>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    CSV Metadata File (Optional)
-                  </label>
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+                <div className="flex items-center gap-3 mb-4">
+                  <FileSpreadsheet className="w-6 h-6 text-indigo-600" />
+                  <h3 className="text-lg font-bold text-gray-900">CSV File</h3>
+                </div>
+                <label className="block">
                   <input
                     type="file"
                     accept=".csv"
                     onChange={(e) => setBulkCsvFile(e.target.files?.[0] || null)}
-                    className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
+                    className="hidden"
                   />
-                  <p className="text-sm text-gray-600 mt-2 font-medium">
-                    CSV with columns: filename, agent_id, campaign, call_date
-                  </p>
-                </div>
-        
-                <div className="border-t-2 border-gray-200 pt-6 mt-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-5">
-                    Default Settings (for files not in CSV)
-                  </h3>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Default Agent
-                      </label>
-                      <select
-                        value={bulkAgentId || ''}
-                        onChange={(e) => setBulkAgentId(Number(e.target.value))}
-                        className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
-                      >
-                        <option value="">Select an agent...</option>
-                        {agents.map((agent) => (
-                          <option key={agent.id} value={agent.id}>
-                            {agent.name} ({agent.email})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Default Campaign
-                      </label>
-                      <input
-                        type="text"
-                        value={bulkCampaign}
-                        onChange={(e) => setBulkCampaign(e.target.value)}
-                        className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
-                        placeholder="e.g., Sales Campaign"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        QA Rubric
-                      </label>
-                      <select
-                        value={bulkQaConfigId || ''}
-                        onChange={(e) => setBulkQaConfigId(Number(e.target.value))}
-                        className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
-                      >
-                        <option value="">Select rubric...</option>
-                        {qaConfigs.map((config) => (
-                          <option key={config.id} value={config.id}>
-                            {config.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                    bulkCsvFile ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-indigo-500'
+                  }`}>
+                    {bulkCsvFile ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <span className="font-medium text-green-700">{bulkCsvFile.name}</span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-600">Click to select CSV file</span>
+                    )}
                   </div>
-                </div>
+                </label>
               </div>
             </div>
-                      
-            <div className="mb-8">
+
+            {/* Upload Button */}
+            <div className="text-center">
               <button
                 onClick={handleBulkUpload}
-                disabled={!bulkZipFile || bulkTaskId !== null}
-                className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:transform-none inline-flex items-center gap-3"
+                disabled={!bulkZipFile || !bulkCsvFile || !bulkAgentId || !!bulkTaskId}
+                className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {bulkTaskId && (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                )}
-                <span>{bulkTaskId ? 'Processing...' : 'Upload & Process Bulk Files'}</span>
+                {bulkTaskId ? 'Processing...' : 'Start Bulk Upload'}
               </button>
             </div>
 
+            {/* Bulk Status */}
             {bulkStatus && (
-              <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg p-8 border border-gray-100">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6">Bulk Upload Status</h3>
-                
-                <div className="mb-6">
-                  <div className="flex justify-between mb-2">
-                    <span className="font-semibold text-gray-700">{bulkStatus.message || 'Processing...'}</span>
-                    <span className="font-bold text-indigo-600">{bulkStatus.progress || 0}%</span>
+              <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Bulk Upload Status</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Status</span>
+                    <span className={`font-medium ${
+                      bulkStatus.status === 'completed' ? 'text-green-600' :
+                      bulkStatus.status === 'failed' ? 'text-red-600' : 'text-yellow-600'
+                    }`}>
+                      {bulkStatus.status}
+                    </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
-                    <div
-                      className="bg-gradient-to-r from-indigo-500 to-purple-600 h-4 rounded-full transition-all duration-300"
-                      style={{ width: `${bulkStatus.progress || 0}%` }}
-                    ></div>
-                  </div>
-                  {bulkStatus.completed !== undefined && (
-                    <p className="text-sm text-gray-600 mt-2">
-                      Completed: {bulkStatus.completed} / {bulkStatus.total}
-                    </p>
+                  {bulkStatus.progress && (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total Files</span>
+                        <span className="font-medium">{bulkStatus.progress.total}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Processed</span>
+                        <span className="font-medium text-green-600">{bulkStatus.progress.processed}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Failed</span>
+                        <span className="font-medium text-red-600">{bulkStatus.progress.failed}</span>
+                      </div>
+                    </>
                   )}
                 </div>
-
-                {bulkStatus.status === 'completed' && bulkStatus.result && (
-                  <div className="grid grid-cols-3 gap-6">
-                    <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-6 shadow-md border border-gray-200">
-                      <div className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Files</div>
-                      <div className="text-3xl font-bold text-gray-900 mt-2">{bulkStatus.result.total_files}</div>
-                    </div>
-                    <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-2xl p-6 shadow-md border border-green-200">
-                      <div className="text-sm font-semibold text-green-700 uppercase tracking-wide">Successful</div>
-                      <div className="text-3xl font-bold text-green-600 mt-2">{bulkStatus.result.successful}</div>
-                    </div>
-                    <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-2xl p-6 shadow-md border border-red-200">
-                      <div className="text-sm font-semibold text-red-700 uppercase tracking-wide">Failed</div>
-                      <div className="text-3xl font-bold text-red-600 mt-2">{bulkStatus.result.failed}</div>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
-          </>
+          </div>
         )}
       </main>
     </div>

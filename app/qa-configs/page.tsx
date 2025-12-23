@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Edit2, Trash2, Save, X, AlertCircle } from 'lucide-react';
+import { Settings, Plus, Edit2, Trash2, Check, X, ArrowLeft } from 'lucide-react';
 
 interface QACategory {
   name: string;
   weight: number;
-  enabled: boolean;
   description: string;
 }
 
@@ -19,7 +18,7 @@ interface QAConfig {
     categories: QACategory[];
   };
   is_default: boolean;
-  created_at?: string;
+  created_at: string;
 }
 
 export default function QAConfigsPage() {
@@ -32,54 +31,54 @@ export default function QAConfigsPage() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/login');
-      return null;
-    }
-    return {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
-  };
-
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-    
-    if (!token || !savedUser) {
+    // ✅ Cookie-based auth
+    checkAuthAndFetch();
+  }, [router]);
+
+  const checkAuthAndFetch = async () => {
+    try {
+      // Check auth status
+      const authResponse = await fetch(`${API_URL}/auth/check`, {
+        credentials: 'include'  // ✅ Use cookies
+      });
+      
+      if (!authResponse.ok) {
+        router.push('/login');
+        return;
+      }
+      
+      const authData = await authResponse.json();
+      setUser(authData.user);
+      
+      // Only managers can access QA configs
+      if (authData.user.role !== 'manager') {
+        alert('Only managers can view QA configurations.');
+        router.push('/');
+        return;
+      }
+
+      // Fetch configs
+      fetchConfigs();
+    } catch (error) {
+      console.error('Auth check error:', error);
       router.push('/login');
-      return;
     }
-
-    const userData = JSON.parse(savedUser);
-    setUser(userData);
-
-    // Only managers can access
-    if (userData.role !== 'manager') {
-      alert('Access denied. Only managers can manage QA configurations.');
-      router.push('/');
-      return;
-    }
-
-    fetchConfigs();
-  }, []);
+  };
 
   const fetchConfigs = async () => {
     try {
-      const headers = getAuthHeaders();
-      if (!headers) return;
-
-      const response = await fetch(`${API_URL}/qa-configs/list`, { headers });
+      const response = await fetch(`${API_URL}/qa-configs/list`, {
+        credentials: 'include'  // ✅ Use cookies
+      });
 
       if (response.ok) {
         const data = await response.json();
-        setConfigs(data.configs);
+        setConfigs(data.configs || []);
       } else if (response.status === 401) {
         router.push('/login');
       } else if (response.status === 403) {
-        alert('Access denied. Only managers can view QA configurations.');
+        alert('Only managers can view QA configurations.');
         router.push('/');
       }
     } catch (error) {
@@ -91,16 +90,16 @@ export default function QAConfigsPage() {
 
   const handleCreateOrUpdate = async (config: Omit<QAConfig, 'id' | 'created_at'>, isEdit: boolean, configId?: number) => {
     try {
-      const headers = getAuthHeaders();
-      if (!headers) return;
-
       const url = isEdit 
         ? `${API_URL}/qa-configs/${configId}`
         : `${API_URL}/qa-configs/create`;
 
       const response = await fetch(url, {
         method: isEdit ? 'PUT' : 'POST',
-        headers,
+        credentials: 'include',  // ✅ Use cookies
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           name: config.name,
           description: config.description,
@@ -129,12 +128,9 @@ export default function QAConfigsPage() {
     }
 
     try {
-      const headers = getAuthHeaders();
-      if (!headers) return;
-
       const response = await fetch(`${API_URL}/qa-configs/${configId}`, {
         method: 'DELETE',
-        headers
+        credentials: 'include'  // ✅ Use cookies
       });
 
       if (response.ok) {
@@ -149,8 +145,16 @@ export default function QAConfigsPage() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_URL}/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'  // ✅ Use cookies
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    localStorage.removeItem('user');
     router.push('/login');
   };
 
@@ -162,7 +166,7 @@ export default function QAConfigsPage() {
             <div className="animate-spin rounded-full h-16 w-16 border-4 border-indigo-200 border-t-indigo-600 mx-auto mb-4"></div>
             <div className="absolute inset-0 animate-ping rounded-full h-16 w-16 border-4 border-indigo-400 opacity-20"></div>
           </div>
-          <p className="text-gray-700 font-medium text-lg">Loading...</p>
+          <p className="text-gray-700 font-medium text-lg">Loading QA configurations...</p>
         </div>
       </div>
     );
@@ -171,127 +175,128 @@ export default function QAConfigsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-indigo-50/20 to-purple-50/10">
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-lg shadow-lg border-b border-white/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-5">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-indigo-900 bg-clip-text text-transparent">QA Configurations</h1>
+      <header className="bg-white/80 backdrop-blur-lg shadow-lg border-b border-white/20">
+        <div className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-4">
               <button
                 onClick={() => router.push('/')}
-                className="text-sm text-indigo-600 hover:text-indigo-800 font-semibold transition-colors duration-200 hover:underline underline-offset-4"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                ← Back to Dashboard
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl shadow-lg">
+                  <Settings className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-indigo-900 to-purple-900 bg-clip-text text-transparent">
+                    QA Configurations
+                  </h1>
+                  <p className="text-gray-600 text-sm">Manage evaluation rubrics</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                <Plus className="w-4 h-4" />
+                New Config
+              </button>
+              {user && (
+                <div className="text-right px-3">
+                  <p className="text-sm font-semibold text-gray-900">{user.name}</p>
+                  <p className="text-xs text-gray-500 capitalize font-medium">{user.role}</p>
+                </div>
+              )}
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-medium transition-all duration-200 shadow-md hover:shadow-lg"
+              >
+                Logout
               </button>
             </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+        {configs.length === 0 ? (
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-12 text-center border border-gray-100">
+            <Settings className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No QA Configurations</h3>
+            <p className="text-gray-600 mb-6">Create your first QA configuration to start evaluating calls.</p>
             <button
-              onClick={handleLogout}
-              className="px-5 py-2.5 text-sm bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all duration-200"
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-medium"
             >
-              Logout
+              <Plus className="w-5 h-5" />
+              Create Configuration
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* Header with Add Button */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">QA Rubrics</h2>
-            <p className="text-sm text-gray-600 mt-1 font-medium">
-              Configure quality assurance criteria for call evaluation
-            </p>
-          </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 font-semibold"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Create Rubric</span>
-          </button>
-        </div>
-
-        {/* Configs List */}
-        <div className="space-y-6">
-          {configs.length === 0 ? (
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 p-16 text-center">
-              <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-6" />
-              <p className="text-gray-700 text-lg font-medium">No QA configurations yet. Create your first rubric!</p>
-            </div>
-          ) : (
-            configs.map((config) => (
-              <div key={config.id} className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg hover:shadow-xl border border-gray-200 p-7 transition-all duration-300 transform hover:-translate-y-1">
-                <div className="flex justify-between items-start mb-6">
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {configs.map((config) => (
+              <div
+                key={config.id}
+                className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg p-6 border border-gray-100 hover:shadow-xl transition-all duration-300"
+              >
+                <div className="flex justify-between items-start mb-4">
                   <div>
-                    <div className="flex items-center space-x-3">
-                      <h3 className="text-2xl font-bold text-gray-900">{config.name}</h3>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-lg font-bold text-gray-900">{config.name}</h3>
                       {config.is_default && (
-                        <span className="px-3 py-1.5 text-xs font-bold bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl shadow-md">
+                        <span className="px-2 py-0.5 bg-green-100 text-green-800 text-xs font-medium rounded-full">
                           Default
                         </span>
                       )}
                     </div>
-                    {config.description && (
-                      <p className="text-sm text-gray-600 mt-2 font-medium">{config.description}</p>
-                    )}
+                    <p className="text-sm text-gray-500">{config.description}</p>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex gap-2">
                     <button
                       onClick={() => setEditingConfig(config)}
-                      className="p-3 text-gray-600 hover:text-indigo-600 bg-gray-100 hover:bg-indigo-100 rounded-xl transition-all duration-200"
+                      className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                     >
-                      <Edit2 className="w-5 h-5" />
+                      <Edit2 className="w-4 h-4" />
                     </button>
-                    {!config.is_default && (
-                      <button
-                        onClick={() => handleDelete(config.id)}
-                        className="p-3 text-gray-600 hover:text-red-600 bg-gray-100 hover:bg-red-100 rounded-xl transition-all duration-200"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleDelete(config.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
 
-                {/* Categories */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {config.criteria.categories.map((category, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-4 rounded-xl border shadow-sm transition-all duration-200 ${
-                        category.enabled
-                          ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-300 hover:shadow-md'
-                          : 'bg-gray-50 border-gray-200 opacity-50'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <p className="text-sm font-bold text-gray-900 capitalize">
-                            {category.name}
-                          </p>
-                          <p className="text-xs text-gray-600 mt-1.5">
-                            {category.description}
-                          </p>
-                        </div>
-                        <span className="text-base font-bold bg-white px-2.5 py-1 rounded-lg shadow-sm text-gray-900">
-                          {category.weight}%
-                        </span>
-                      </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Categories</p>
+                  {config.criteria?.categories?.map((cat, idx) => (
+                    <div key={idx} className="flex justify-between items-center text-sm">
+                      <span className="text-gray-700">{cat.name}</span>
+                      <span className="text-gray-500 font-medium">{cat.weight}%</span>
                     </div>
                   ))}
                 </div>
+
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs text-gray-400">
+                    Created {new Date(config.created_at).toLocaleDateString()}
+                  </p>
+                </div>
               </div>
-            ))
-          )}
-        </div>
-      </div>
+            ))}
+          </div>
+        )}
+      </main>
 
       {/* Create/Edit Modal */}
       {(showCreateModal || editingConfig) && (
         <ConfigModal
           config={editingConfig}
-          onSave={handleCreateOrUpdate}
+          onSave={(config) => handleCreateOrUpdate(config, !!editingConfig, editingConfig?.id)}
           onClose={() => {
             setShowCreateModal(false);
             setEditingConfig(null);
@@ -302,197 +307,180 @@ export default function QAConfigsPage() {
   );
 }
 
-// Modal Component
+// Config Modal Component
 function ConfigModal({
   config,
   onSave,
   onClose
 }: {
   config: QAConfig | null;
-  onSave: (config: Omit<QAConfig, 'id' | 'created_at'>, isEdit: boolean, configId?: number) => void;
+  onSave: (config: Omit<QAConfig, 'id' | 'created_at'>) => void;
   onClose: () => void;
 }) {
-  const [name, setName] = useState(config?.name || '');
-  const [description, setDescription] = useState(config?.description || '');
-  const [categories, setCategories] = useState<QACategory[]>(
-    config?.criteria.categories || [
-      { name: 'greeting', weight: 15, enabled: true, description: 'Proper greeting and introduction' },
-      { name: 'tone', weight: 20, enabled: true, description: 'Professional and empathetic tone' },
-      { name: 'understanding', weight: 20, enabled: true, description: 'Understanding customer needs' },
-      { name: 'solution', weight: 25, enabled: true, description: 'Providing accurate solutions' },
-      { name: 'clarity', weight: 10, enabled: true, description: 'Clear communication' },
-      { name: 'closing', weight: 10, enabled: true, description: 'Proper call closing' }
+  const [formData, setFormData] = useState({
+    name: config?.name || '',
+    description: config?.description || '',
+    is_default: config?.is_default || false,
+    categories: config?.criteria?.categories || [
+      { name: 'Communication', weight: 20, description: 'Clarity and professionalism' },
+      { name: 'Product Knowledge', weight: 20, description: 'Accuracy of information' },
+      { name: 'Problem Resolution', weight: 20, description: 'Issue handling effectiveness' },
+      { name: 'Customer Engagement', weight: 15, description: 'Rapport building' },
+      { name: 'Compliance', weight: 15, description: 'Following protocols' },
+      { name: 'Efficiency', weight: 10, description: 'Time management' },
     ]
-  );
-  const [isDefault, setIsDefault] = useState(config?.is_default || false);
+  });
 
-  const totalWeight = categories.reduce((sum, cat) => cat.enabled ? sum + cat.weight : sum, 0);
-  const isValid = totalWeight === 100 && name.trim() !== '';
-
-  const handleCategoryChange = (index: number, field: keyof QACategory, value: any) => {
-    const updated = [...categories];
-    updated[index] = { ...updated[index], [field]: value };
-    setCategories(updated);
+  const handleCategoryChange = (index: number, field: string, value: string | number) => {
+    const newCategories = [...formData.categories];
+    newCategories[index] = { ...newCategories[index], [field]: value };
+    setFormData({ ...formData, categories: newCategories });
   };
 
-  const handleSave = () => {
-    if (!isValid) {
-      alert('Please ensure enabled weights sum to 100% and name is provided');
+  const addCategory = () => {
+    setFormData({
+      ...formData,
+      categories: [...formData.categories, { name: '', weight: 0, description: '' }]
+    });
+  };
+
+  const removeCategory = (index: number) => {
+    const newCategories = formData.categories.filter((_, i) => i !== index);
+    setFormData({ ...formData, categories: newCategories });
+  };
+
+  const totalWeight = formData.categories.reduce((sum, cat) => sum + Number(cat.weight), 0);
+
+  const handleSubmit = () => {
+    if (totalWeight !== 100) {
+      alert('Total weight must equal 100%');
       return;
     }
-
-    onSave(
-      {
-        name,
-        description,
-        criteria: { categories },
-        is_default: isDefault
-      },
-      !!config,
-      config?.id
-    );
+    onSave({
+      name: formData.name,
+      description: formData.description,
+      is_default: formData.is_default,
+      criteria: { categories: formData.categories }
+    });
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto animate-fadeIn">
-      <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full my-8 border border-gray-200 transform transition-all duration-300">
-        <div className="flex justify-between items-center px-8 py-6 border-b bg-gradient-to-r from-gray-50 to-white">
-          <h3 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-indigo-900 bg-clip-text text-transparent">
-            {config ? 'Edit QA Rubric' : 'Create QA Rubric'}
-          </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-all duration-200 hover:rotate-90 transform">
-            <X className="w-6 h-6" />
-          </button>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {config ? 'Edit Configuration' : 'New Configuration'}
+            </h2>
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
         </div>
 
-        <div className="p-8 space-y-7 max-h-[70vh] overflow-y-auto">
-          {/* Basic Info */}
-          <div className="space-y-5">
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                Rubric Name *
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
-                placeholder="e.g., Sales Campaign QA"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-5 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white hover:bg-gray-50"
-                rows={2}
-                placeholder="Optional description"
-              />
-            </div>
-
-            <div className="flex items-center space-x-3 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
-              <input
-                type="checkbox"
-                id="is_default"
-                checked={isDefault}
-                onChange={(e) => setIsDefault(e.target.checked)}
-                className="rounded-lg border-gray-300 text-indigo-600 focus:ring-indigo-500 w-5 h-5"
-              />
-              <label htmlFor="is_default" className="text-sm font-semibold text-gray-800">
-                Set as default rubric
-              </label>
-            </div>
+        <div className="p-6 space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              placeholder="e.g., Standard QA Rubric"
+            />
           </div>
 
-          {/* Categories */}
           <div>
-            <div className="flex justify-between items-center mb-5 p-4 bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-200">
-              <h4 className="text-base font-bold text-gray-900">QA Categories</h4>
-              <div className={`text-sm font-bold px-4 py-2 rounded-lg ${totalWeight === 100 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                Total Weight: {totalWeight}% {totalWeight === 100 ? '✓' : '(must be 100%)'}
-              </div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              className="w-full px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              rows={2}
+              placeholder="Describe this QA configuration..."
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="is_default"
+              checked={formData.is_default}
+              onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
+              className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+            />
+            <label htmlFor="is_default" className="text-sm font-medium text-gray-700">
+              Set as default configuration
+            </label>
+          </div>
+
+          <div>
+            <div className="flex justify-between items-center mb-4">
+              <label className="block text-sm font-medium text-gray-700">
+                Categories ({totalWeight}% / 100%)
+              </label>
+              <button
+                onClick={addCategory}
+                className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+              >
+                + Add Category
+              </button>
             </div>
 
-            <div className="space-y-5">
-              {categories.map((category, index) => (
-                <div key={index} className="border-2 border-gray-200 rounded-2xl p-5 hover:border-indigo-300 transition-all duration-200 bg-white shadow-sm">
-                  <div className="flex items-start space-x-4">
+            <div className="space-y-3">
+              {formData.categories.map((cat, idx) => (
+                <div key={idx} className="flex gap-3 items-start bg-gray-50 p-3 rounded-xl">
+                  <div className="flex-1">
                     <input
-                      type="checkbox"
-                      checked={category.enabled}
-                      onChange={(e) => handleCategoryChange(index, 'enabled', e.target.checked)}
-                      className="mt-1.5 rounded-lg border-gray-300 text-indigo-600 focus:ring-indigo-500 w-5 h-5"
+                      type="text"
+                      value={cat.name}
+                      onChange={(e) => handleCategoryChange(idx, 'name', e.target.value)}
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                      placeholder="Category name"
                     />
-
-                    <div className="flex-1 space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
-                            Category Name
-                          </label>
-                          <input
-                            type="text"
-                            value={category.name}
-                            onChange={(e) => handleCategoryChange(index, 'name', e.target.value)}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
-                            disabled={!category.enabled}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
-                            Weight (%)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={category.weight}
-                            onChange={(e) => handleCategoryChange(index, 'weight', parseInt(e.target.value) || 0)}
-                            className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
-                            disabled={!category.enabled}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide">
-                          Description
-                        </label>
-                        <textarea
-                          value={category.description}
-                          onChange={(e) => handleCategoryChange(index, 'description', e.target.value)}
-                          className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200"
-                          rows={2}
-                          disabled={!category.enabled}
-                        />
-                      </div>
-                    </div>
                   </div>
+                  <div className="w-20">
+                    <input
+                      type="number"
+                      value={cat.weight}
+                      onChange={(e) => handleCategoryChange(idx, 'weight', parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500"
+                      placeholder="%"
+                      min="0"
+                      max="100"
+                    />
+                  </div>
+                  <button
+                    onClick={() => removeCategory(idx)}
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               ))}
             </div>
+
+            {totalWeight !== 100 && (
+              <p className="mt-2 text-sm text-red-600">
+                Total weight must equal 100% (currently {totalWeight}%)
+              </p>
+            )}
           </div>
         </div>
 
-        <div className="flex justify-end space-x-4 px-8 py-6 border-t bg-gradient-to-r from-gray-50 to-white">
+        <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-100 font-semibold transition-all duration-200 shadow-sm hover:shadow-md"
+            className="px-6 py-2.5 text-gray-700 hover:bg-gray-100 rounded-xl font-medium transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={handleSave}
-            disabled={!isValid}
-            className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105 disabled:transform-none"
+            onClick={handleSubmit}
+            disabled={totalWeight !== 100 || !formData.name}
+            className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Save className="w-5 h-5" />
-            <span>{config ? 'Update' : 'Create'} Rubric</span>
+            {config ? 'Update' : 'Create'}
           </button>
         </div>
       </div>
