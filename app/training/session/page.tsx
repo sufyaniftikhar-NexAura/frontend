@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   LiveKitRoom,
@@ -24,7 +24,8 @@ interface Message {
   isFinal: boolean;
 }
 
-export default function TrainingSessionPage() {
+// ✅ 1. Main logic moved to this inner component
+function TrainingSessionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [connectionDetails, setConnectionDetails] = useState<{
@@ -279,6 +280,21 @@ export default function TrainingSessionPage() {
       />
       <RoomAudioRenderer />
     </LiveKitRoom>
+  );
+}
+
+// ============================================
+// ✅ 2. Default export wraps content in Suspense
+// ============================================
+export default function TrainingSessionPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-purple-100 flex items-center justify-center">
+        <Loader2 className="w-16 h-16 text-indigo-600 animate-spin" />
+      </div>
+    }>
+      <TrainingSessionContent />
+    </Suspense>
   );
 }
 
