@@ -109,29 +109,13 @@ export default function TrainingPortalPage() {
     }
   };
 
-  const startTrainingSession = async (scenarioId: string) => {
-    try {
-      const response = await fetch(`${API_URL}/training/sessions/start`, {
-        method: 'POST',
-        credentials: 'include',  // ✅ Use cookies
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ scenario_id: scenarioId })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Navigate to session page with session ID
-        router.push(`/training/session?sessionId=${data.session_id}&scenarioId=${scenarioId}`);
-      } else {
-        const error = await response.json();
-        alert(error.detail || 'Failed to start session');
-      }
-    } catch (error) {
-      console.error('Error starting session:', error);
-      alert('Failed to start training session');
-    }
+  // ✅ FIXED: Don't call API here. Just save ID and redirect.
+  const startTrainingSession = (scenarioId: string) => {
+    // Store in sessionStorage so the session page can read it
+    sessionStorage.setItem('selected_training_scenario', scenarioId);
+    
+    // Navigate to session page (which will handle the API call)
+    router.push(`/training/session?scenarioId=${scenarioId}`);
   };
 
   const handleLogout = async () => {
